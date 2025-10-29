@@ -7,7 +7,7 @@ from vidurai.core.koshas import ViduraiMemory, Memory
 from vidurai.core.vismriti import VismritiEngine, ForgettingPolicy
 from vidurai.core.viveka import VivekaEngine
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"  # Updated for LangChain integration
 __author__ = "Vidurai Team"
 
 # Export main classes
@@ -47,3 +47,12 @@ def create_memory_system(
     memory.viveka = VivekaEngine()
     
     return memory
+
+
+# LangChain Integration (optional import)
+try:
+    from vidurai.integrations.langchain import ViduraiMemory as LangChainViduraiMemory, ViduraiConversationChain
+    __all__.extend(["LangChainViduraiMemory", "ViduraiConversationChain"])
+except ImportError:
+    # LangChain not installed - integrations not available
+    pass

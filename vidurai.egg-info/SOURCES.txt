@@ -1,0 +1,16 @@
+README.md
+pyproject.toml
+setup.py
+vidurai/__init__.py
+vidurai.egg-info/PKG-INFO
+vidurai.egg-info/SOURCES.txt
+vidurai.egg-info/dependency_links.txt
+vidurai.egg-info/requires.txt
+vidurai.egg-info/top_level.txt
+vidurai/api/__init__.py
+vidurai/core/__init__.py
+vidurai/core/koshas.py
+vidurai/core/vismriti.py
+vidurai/core/viveka.py
+vidurai/integrations/__init__.py
+vidurai/wisdom/__init__.py
