@@ -13,4 +13,5 @@ vidurai/core/koshas.py
 vidurai/core/vismriti.py
 vidurai/core/viveka.py
 vidurai/integrations/__init__.py
+vidurai/integrations/langchain.py
 vidurai/wisdom/__init__.py

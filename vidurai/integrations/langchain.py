@@ -20,6 +20,8 @@ class ViduraiMemory(BaseChatMemory):
     """
     
     memory_key: str = "chat_history"
+    input_key: str = "input"
+    output_key: str = "output"
     vidurai_memory: Any = Field(default_factory=create_memory_system)
     max_token_limit: int = 2000
     

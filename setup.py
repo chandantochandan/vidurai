@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="vidurai",
-    version="0.2.0",  # Updated for LangChain integration
+    version="0.2.1",  # Updated for LangChain integration
     author="Chandan",
     author_email="yvidurai@gmail.com",
     description="Teaching AI the art of memory and forgetting - A Vedantic approach to AI memory management",

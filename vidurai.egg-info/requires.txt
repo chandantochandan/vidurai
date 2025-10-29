@@ -1,10 +1,13 @@
-langchain>=0.1.0
-llama-index>=0.9.0
 sentence-transformers>=2.2.0
 nltk>=3.8
 faiss-cpu>=1.7.4
 loguru>=0.7.0
 numpy>=1.24.0
+
+[all]
+langchain>=0.1.0
+langchain-community>=0.0.1
+llama-index>=0.9.0
 
 [dev]
 pytest>=7.0.0
@@ -12,3 +15,10 @@ pytest-cov>=4.0.0
 black>=23.0.0
 flake8>=6.0.0
 mypy>=1.0.0
+
+[langchain]
+langchain>=0.1.0
+langchain-community>=0.0.1
+
+[llamaindex]
+llama-index>=0.9.0
