@@ -5,10 +5,10 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="vidurai",
-    version="1.5.0",  # Updated for LangChain integration
+    version="1.5.0",
     author="Chandan",
     author_email="yvidurai@gmail.com",
-    description="Teaching AI the art of memory and forgetting - A Vedantic approach to AI memory management",
+    description="Self-learning AI memory system with RL-based compression - Intelligence emerges from experience, not rules",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/chandantochandan/vidurai",
@@ -18,12 +18,14 @@ setup(
         "Source Code": "https://github.com/chandantochandan/vidurai",
         "Bug Tracker": "https://github.com/chandantochandan/vidurai/issues",
         "Discord": "https://discord.gg/DHdgS8eA",
+        "Changelog": "https://github.com/chandantochandan/vidurai/blob/main/CHANGELOG.md",
     },
     packages=find_packages(),
     classifiers=[
-        "Development Status :: 3 - Alpha",
+        "Development Status :: 4 - Beta",  # Upgraded from Alpha
         "Intended Audience :: Developers",
         "Topic :: Scientific/Engineering :: Artificial Intelligence",
+        "Topic :: Software Development :: Libraries :: Python Modules",
         "License :: OSI Approved :: MIT License",
         "Programming Language :: Python :: 3",
         "Programming Language :: Python :: 3.8",
@@ -31,16 +33,25 @@ setup(
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
         "Programming Language :: Python :: 3.12",
+        "Operating System :: OS Independent",
     ],
     python_requires=">=3.8",
     install_requires=[
-        "sentence-transformers>=2.2.0",
-        "nltk>=3.8",
-        "faiss-cpu>=1.7.4",
-        "loguru>=0.7.0",
-        "numpy>=1.24.0",
+        "loguru>=0.7.0",  # Minimal core dependency
     ],
     extras_require={
+        # RL Agent and Semantic Compression (v1.5.0 core features)
+        "rl": [
+            "sentence-transformers>=2.2.0",  # For semantic relevance
+        ],
+        # LLM providers for semantic compression
+        "openai": [
+            "openai>=1.0.0",
+        ],
+        "anthropic": [
+            "anthropic>=0.18.0",
+        ],
+        # Legacy integrations
         "langchain": [
             "langchain>=0.1.0",
             "langchain-community>=0.0.1",
@@ -48,11 +59,16 @@ setup(
         "llamaindex": [
             "llama-index>=0.9.0",
         ],
+        # All features
         "all": [
+            "sentence-transformers>=2.2.0",
+            "openai>=1.0.0",
+            "anthropic>=0.18.0",
             "langchain>=0.1.0",
             "langchain-community>=0.0.1",
             "llama-index>=0.9.0",
         ],
+        # Development tools
         "dev": [
             "pytest>=7.0.0",
             "pytest-cov>=4.0.0",
@@ -61,5 +77,5 @@ setup(
             "mypy>=1.0.0",
         ],
     },
-    keywords="ai memory llm langchain llamaindex vedantic forgetting consciousness kosha vismriti viveka",
+    keywords="ai memory reinforcement-learning rl-agent semantic-compression llm langchain llamaindex vedantic forgetting consciousness kosha vismriti q-learning",
 )
