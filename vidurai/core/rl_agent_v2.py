@@ -109,22 +109,22 @@ class Outcome:
         Calculate reward based on outcome and user's priority profile
         """
         weights = RewardFunction.PROFILES[profile]
-        
+
         # 1. Token savings (cost reduction)
-        cost_saved = (self.tokens_saved / 1000) * 0.002  # GPT-3.5 pricing
-        token_reward = cost_saved * 1000 * weights['token_weight']
-        
+        # BUGFIX: Removed tiny pricing multiplier, use direct token count with scaling
+        token_reward = (self.tokens_saved / 10) * weights['token_weight']
+
         # 2. Retrieval accuracy (quality)
         quality_reward = self.retrieval_accuracy * 50 * weights['quality_weight']
-        
+
         # 3. Information loss penalty
         loss_penalty = self.information_loss * 100 * weights['loss_penalty']
-        
+
         # 4. User satisfaction bonus
         satisfaction_bonus = self.user_satisfaction * 30
-        
+
         total_reward = token_reward + quality_reward - loss_penalty + satisfaction_bonus
-        
+
         return total_reward
 
 
@@ -161,14 +161,14 @@ class RewardFunction:
             'loss_penalty': 2.0,
         },
         RewardProfile.COST_FOCUSED: {
-            'token_weight': 2.0,
+            'token_weight': 3.0,  # BUGFIX: Increased to properly favor token savings
             'quality_weight': 0.5,
-            'loss_penalty': 1.0,
+            'loss_penalty': 0.5,  # BUGFIX: Decreased to tolerate more information loss
         },
         RewardProfile.QUALITY_FOCUSED: {
-            'token_weight': 0.5,
+            'token_weight': 0.3,  # BUGFIX: Decreased to de-prioritize cost savings
             'quality_weight': 2.0,
-            'loss_penalty': 3.0,
+            'loss_penalty': 5.0,  # BUGFIX: Increased to strongly penalize information loss
         }
     }
 

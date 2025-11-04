@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="vidurai",
-    version="1.5.0",
+    version="1.5.1",
     author="Chandan",
     author_email="yvidurai@gmail.com",
     description="Self-learning AI memory system with RL-based compression - Intelligence emerges from experience, not rules",

@@ -226,23 +226,30 @@ class ViduraiMemory:
     """
     
     def __init__(
-        self, 
-        enable_compression: bool = True, 
+        self,
+        enable_compression: bool = True,
         llm_client=None,
         enable_rl_agent: bool = True,
-        reward_profile: Optional[RewardProfile] = None
+        reward_profile: Optional[RewardProfile] = None,
+        decay_rate: float = 0.95,
+        enable_decay: bool = True
     ):
         """
         Initialize Vidurai Memory System
-        
+
         Args:
             enable_compression: Enable semantic compression (default: True)
             llm_client: LLM client for compression (default: MockLLMClient)
             enable_rl_agent: Enable RL Agent for intelligent decisions (default: True)
             reward_profile: User's priority (cost vs. quality)
+            decay_rate: Importance decay rate for episodic memory (default: 0.95)
+            enable_decay: Enable importance decay (default: True, set False for high-threshold recall)
         """
         self.working = AnnamayaKosha()
-        self.episodic = ManomayaKosha()
+        # Pass decay configuration to episodic memory
+        self.episodic = ManomayaKosha(
+            decay_rate=decay_rate if enable_decay else 1.0
+        )
         self.archival = VijnanamayaKosha()
         self.vismriti = None  # Will be set by create_memory_system()
         
@@ -418,13 +425,16 @@ class ViduraiMemory:
             if result.success:
                 logger.info(f"✨ Compressed {window.message_count} messages: "
                           f"saved {result.tokens_saved} tokens ({result.compression_ratio:.1%})")
-                
-                # Remove compressed memories from working layer
+
+                # Remove compressed memories from working layer AND episodic layer
+                # This is CRITICAL to prevent token accumulation!
                 for msg in window.messages:
-                    # Find and remove corresponding memory
+                    # Find and remove corresponding memory from both layers
                     for mem in list(self.working.memories):
                         if mem.content == msg.content:
                             self.working.remove(mem)
+                            # BUGFIX: Also remove from episodic to prevent accumulation
+                            self.episodic.remove(mem)
                             break
                 
                 # Store compressed summary in episodic layer

@@ -7,7 +7,7 @@ from vidurai.core.koshas import ViduraiMemory, Memory
 from vidurai.core.vismriti import VismritiEngine, ForgettingPolicy
 from vidurai.core.viveka import VivekaEngine
 
-__version__ = "1.5.0"  # Updated for LangChain integration
+__version__ = "1.5.1"  # Bugfix release: token accumulation, decay control, reward profiles
 __author__ = "Vidurai Team"
 
 # Export main classes
