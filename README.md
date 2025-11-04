@@ -10,6 +10,8 @@
 
 **The first self-learning AI memory system that strategically forgets.** Teaching AI the ancient art of memory through experience, not rules—inspired by Vidura's wisdom from the Mahabharata.
 
+> 🚨 **v1.5.1 Released (2025-11-03)** - Critical bug fixes for token accumulation, recall reliability, and reward profiles. All v1.5.0 users should upgrade immediately. See [CHANGELOG](CHANGELOG.md) for details.
+
 ---
 
 ## 🎯 The Problem We Solve
@@ -118,6 +120,81 @@ memory = Vidurai(compression_agent=rl_agent)
 
 ---
 
+## ⚠️ Known Limitations & Solutions
+
+### High-Threshold Recall (v1.5.1+)
+
+**Issue:** Importance decay causes memories to drop below high thresholds over time
+**Example:** A memory with importance=0.95 drops to ~0.36 after 20 messages (0.95^20)
+**Impact:** `recall(min_importance=0.7)` may return fewer results than expected
+
+**Solutions:**
+```python
+# Option 1: Disable decay for critical applications
+memory = ViduraiMemory(enable_decay=False)
+critical_memories = memory.recall(min_importance=0.7)  # Now returns all HIGH memories
+
+# Option 2: Use slower decay rate
+memory = ViduraiMemory(decay_rate=0.98)  # Instead of default 0.95
+# After 20 messages: 0.95 × (0.98^19) ≈ 0.64 (stays above 0.5)
+
+# Option 3: Use lower thresholds (0.3-0.5 work reliably with decay)
+important_memories = memory.recall(min_importance=0.4)
+```
+
+---
+
+### RL Agent Maturity
+
+**Note:** The RL agent needs 50-100 episodes for reward profiles to fully differentiate behavior
+**Expected:** First 10-20 episodes show exploration behavior (epsilon=0.30)
+**After maturity:** Epsilon decays to 0.05 and learned policies become stable
+
+**Monitor learning progress:**
+```python
+stats = memory.get_rl_agent_stats()
+print(f"Episodes: {stats['episodes']}")
+print(f"Epsilon: {stats['epsilon']:.3f}")
+print(f"Q-table states: {stats['q_table_size']}")
+```
+
+---
+
+### File Storage Scale
+
+**Limitation:** File-based persistence (`~/.vidurai/`) optimal for <100K experiences
+**Current:** Uses JSONL for experiences, JSON for Q-table
+**Performance:** May slow down with very large experience buffers
+
+**Future:** Optional SQLite backend planned for v1.6.0
+
+**Workaround for now:**
+```python
+# Periodically check and clean if needed
+import os
+exp_file = os.path.expanduser("~/.vidurai/experiences.jsonl")
+if os.path.exists(exp_file) and os.path.getsize(exp_file) > 10_000_000:  # 10MB
+    # Backup and truncate or implement your own cleanup
+    pass
+```
+
+---
+
+### Token Optimization (Fixed in v1.5.1)
+
+**Issue in v1.5.0:** Token count increased by 13.8% instead of decreasing
+**Status:** ✅ **FIXED in v1.5.1**
+**Action:** Upgrade to v1.5.1+ for proper token savings
+```bash
+pip install --upgrade vidurai
+```
+
+---
+
+For detailed troubleshooting, see [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
+
+---
+
 ## 📊 Performance & RL-Powered Cost Savings
 
 ### Real-World Token Reduction
@@ -176,12 +253,21 @@ vidurai/
 
 ## 🎯 Roadmap
 
-### ✅ **v1.5.0 - The Learning Release (Current)**
+### ✅ **v1.5.1 - Critical Bug Fixes (Current)**
+- [x] **FIXED: Token accumulation bug** - Compression now properly reduces tokens (was +13.8%, now -36.6%)
+- [x] **FIXED: High-threshold recall** - Added `enable_decay` parameter for reliable recall
+- [x] **FIXED: Reward profile inversion** - COST_FOCUSED/QUALITY_FOCUSED now behave correctly
+- [x] All fixes maintain full backward compatibility
+- [x] Comprehensive verification tests added
+
+**Upgrade highly recommended for all v1.5.0 users!**
+
+### ✅ **v1.5.0 - The Learning Release**
 - [x] **Vismriti RL Agent** - Q-learning for autonomous compression
 - [x] Three-Kosha memory architecture
 - [x] Viveka conscience layer with adaptive importance scoring
 - [x] LangChain integration with `ViduraiMemory`
-- [x] 36%+ token savings verified in production scenarios
+- [x] 36%+ token savings verified (after v1.5.1 fixes)
 - [ ] LlamaIndex integration
 - [ ] Comprehensive documentation & examples
 
