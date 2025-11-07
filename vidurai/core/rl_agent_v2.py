@@ -290,7 +290,8 @@ class QLearningPolicy:
         self.gamma = gamma
         
         # Q-table: state_hash → action → expected_reward
-        self.q_table: Dict[str, Dict[Action, float]] = defaultdict(lambda: defaultdict(float))
+        # NOTE: Using regular dict instead of defaultdict for pickle compatibility
+        self.q_table: Dict[str, Dict[Action, float]] = {}
         
         # Learning statistics
         self.episodes = 0
@@ -299,7 +300,25 @@ class QLearningPolicy:
         # Storage
         self.storage_path = Path(storage_dir).expanduser() / "q_table.json"
         self.load_q_table()
-    
+
+    def _get_or_create_state(self, state_hash: str) -> Dict[Action, float]:
+        """
+        Get Q-values for a state, creating empty dict if needed.
+
+        This replaces the defaultdict pattern to enable pickle serialization.
+        Lambda functions in defaultdict prevent pickling, so we use explicit
+        dict creation instead.
+
+        Args:
+            state_hash: Discretized state identifier from MemoryState.to_hash()
+
+        Returns:
+            Dictionary mapping actions to Q-values for this state
+        """
+        if state_hash not in self.q_table:
+            self.q_table[state_hash] = {}
+        return self.q_table[state_hash]
+
     def get_epsilon(self) -> float:
         """
         Calculate current epsilon (exploration rate)
@@ -328,42 +347,42 @@ class QLearningPolicy:
     def _best_action(self, state: MemoryState) -> Action:
         """Get action with highest Q-value for state"""
         state_hash = state.to_hash()
-        
-        if state_hash not in self.q_table:
-            return Action.DO_NOTHING  # Default
-        
-        # Get action with max Q-value
-        q_values = self.q_table[state_hash]
+
+        # Use helper method to get or create state entry
+        q_values = self._get_or_create_state(state_hash)
+
         if not q_values:
-            return Action.DO_NOTHING
-        
+            return Action.DO_NOTHING  # Default when no learned Q-values
+
+        # Get action with max Q-value
         best_action = max(q_values.items(), key=lambda x: x[1])[0]
         return best_action
     
     def learn(self, experience: Experience):
         """
         Update Q-values from experience
-        
+
         Q(s,a) ← Q(s,a) + α[r + γ·max Q(s',a') - Q(s,a)]
         """
         state_hash = experience.state.to_hash()
         next_state_hash = experience.next_state.to_hash()
-        
-        # Current Q-value
-        current_q = self.q_table[state_hash][experience.action]
-        
+
+        # Get current Q-value (use helper method for safe access)
+        state_q_values = self._get_or_create_state(state_hash)
+        current_q = state_q_values.get(experience.action, 0.0)
+
         # Best future Q-value
-        next_q_values = self.q_table[next_state_hash]
+        next_q_values = self._get_or_create_state(next_state_hash)
         max_future_q = max(next_q_values.values()) if next_q_values else 0.0
-        
+
         # Q-learning update
         new_q = current_q + self.alpha * (
             experience.reward + self.gamma * max_future_q - current_q
         )
-        
+
         # Update Q-table
-        self.q_table[state_hash][experience.action] = new_q
-        
+        state_q_values[experience.action] = new_q
+
         # Update statistics
         self.total_reward += experience.reward
     
@@ -418,7 +437,36 @@ class QLearningPolicy:
         
         except Exception as e:
             print(f"Warning: Could not load Q-table: {e}")
-    
+
+    def __getstate__(self):
+        """
+        Prepare QLearningPolicy for pickling.
+
+        Since we replaced defaultdict with regular dict, the q_table is now
+        fully picklable without any modifications. This method documents the
+        pickle protocol for clarity and future maintainability.
+
+        Returns:
+            Dictionary of serializable state
+        """
+        return self.__dict__.copy()
+
+    def __setstate__(self, state):
+        """
+        Restore QLearningPolicy from pickled state.
+
+        Handles edge cases and ensures proper restoration of all attributes.
+
+        Args:
+            state: Pickled state dictionary
+        """
+        self.__dict__.update(state)
+
+        # Ensure storage_path is a Path object (handles edge cases where
+        # it might be deserialized as a string in some scenarios)
+        if hasattr(self, 'storage_path') and isinstance(self.storage_path, str):
+            self.storage_path = Path(self.storage_path)
+
     def get_statistics(self) -> Dict[str, Any]:
         """Get learning statistics"""
         return {

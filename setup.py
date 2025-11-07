@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="vidurai",
-    version="1.5.1",
+    version="1.6.1",
     author="Chandan",
     author_email="yvidurai@gmail.com",
     description="Self-learning AI memory system with RL-based compression - Intelligence emerges from experience, not rules",
@@ -38,6 +38,7 @@ setup(
     python_requires=">=3.8",
     install_requires=[
         "loguru>=0.7.0",  # Minimal core dependency
+        "pandas>=1.3.0",  # Required for memory ledger (v1.6.0+)
     ],
     extras_require={
         # RL Agent and Semantic Compression (v1.5.0 core features)
@@ -61,6 +62,7 @@ setup(
         ],
         # All features
         "all": [
+            "pandas>=1.3.0",
             "sentence-transformers>=2.2.0",
             "openai>=1.0.0",
             "anthropic>=0.18.0",

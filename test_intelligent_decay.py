@@ -90,7 +90,7 @@ forget_count = 0
 
 for i, memory in enumerate(test_memories, 1):
     decay_score = decay_engine.calculate_decay_score(memory, context)
-    should_forget = decay_engine.should_forget(memory, decay_threshold=0.1, context=context)
+    should_forget = decay_engine.should_forget(memory, decay_threshold=0.15, context=context)
     
     # Calculate entropy for display
     entropy = entropy_calc.calculate_combined(memory.content)

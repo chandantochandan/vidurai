@@ -1,23 +1,41 @@
 """
 Vidurai - Teaching AI the Art of Memory and Forgetting
 A Vedantic approach to AI memory management
+
+विस्मृति भी विद्या है (Forgetting too is knowledge)
 """
 
+# Legacy API (v1.5.x)
 from vidurai.core.koshas import ViduraiMemory, Memory
 from vidurai.core.vismriti import VismritiEngine, ForgettingPolicy
 from vidurai.core.viveka import VivekaEngine
 
-__version__ = "1.5.1"  # Bugfix release: token accumulation, decay control, reward profiles
+# New API (v1.6.0 - Vismriti Architecture)
+from vidurai.vismriti_memory import VismritiMemory
+from vidurai.core.data_structures_v3 import (
+    Memory as VismritiMemoryObject,
+    SalienceLevel,
+    MemoryStatus
+)
+
+__version__ = "1.6.1"  # Patch: Added pandas dependency
 __author__ = "Vidurai Team"
 
 # Export main classes
 __all__ = [
+    # Legacy v1.5.x (still supported)
     "ViduraiMemory",
-    "Memory", 
+    "Memory",
     "VismritiEngine",
     "ForgettingPolicy",
     "VivekaEngine",
-    "create_memory_system"
+    "create_memory_system",
+
+    # New v1.6.0 (Vismriti Architecture)
+    "VismritiMemory",
+    "VismritiMemoryObject",
+    "SalienceLevel",
+    "MemoryStatus",
 ]
 
 def create_memory_system(
