@@ -59,6 +59,28 @@ The core differentiator is the **RL Optimization Agent (Q-Learning)**, which aut
 
 ---
 
+## ⚔️ Vidurai vs. Mem0: The Anti-Bloat Alternative
+
+Vidurai is the **philosophical and architectural mirror image** of [Mem0](https://github.com/mem0ai/mem0).
+
+Where Mem0 seeks to *add* complexity, Vidurai seeks to *subtract* it.
+
+| Feature | Mem0 (The "More is Better" Approach) | Vidurai (The "Less is More" Approach) |
+|:---|:---|:---|
+| **Primary Goal** | **Maximize Retention:** Build complex user profiles, knowledge graphs, and relationship maps. | **Minimize Cost:** Ruthlessly prune, compress, and discard tokens to fit budgets. |
+| **Mechanism** | **Additive:** Injects *more* tokens from external Vector/Graph DBs into your prompt. | **Subtractive:** Removes redundant tokens from your existing context using RL. |
+| **Infrastructure** | **Heavy:** Requires Vector DBs (Qdrant/Pinecone) + Graph DBs (Neo4j). | **Lightweight:** Pure Python + Local File/SQLite. No external dependencies. |
+| **Cost Impact** | 💸 **Increases Costs:** Retrieved context *adds* to your input token bill. | 💰 **Slashes Costs:** Compression *reduces* your input token bill by ~40%. |
+| **Philosophy** | *"Remember everything, even the noise."* | *"Forget the noise, keep the signal."* |
+
+**The Verdict:**
+If you want to build a "Her"-like companion that remembers your childhood pet's name to build emotional rapport, use **Mem0**.
+If you want to build a production LLM application that doesn't bankrupt you on API costs while maintaining context fidelity, use **Vidurai**.
+
+**Vidurai strips away the "memory decorations"—graphs, relationship mapping, and psychological profiling—to focus on the only metric that matters in production: Information Density per Dollar.**
+
+---
+
 ## 📦 Installation
 
 ```bash
