@@ -2,14 +2,14 @@
 Vidurai v2.0 - Core Data Structures
 Intelligent Vismriti Engine
 """
-from dataclasses import dataclass, field
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 from enum import Enum
 import uuid
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 
 
-class MemoryType(Enum):
+class MemoryType(str, Enum):
     """Types of memories in the Three Koshas"""
     WORKING = "working"  # Annamaya Kosha
     EPISODIC = "episodic"  # Manomaya Kosha
@@ -17,19 +17,18 @@ class MemoryType(Enum):
     COMPRESSED = "compressed"  # Special type for compressed memories
 
 
-@dataclass
-class Memory:
+class Memory(BaseModel):
     """
     Base memory unit in Vidurai
     """
     content: str
-    memory_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    memory_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     memory_type: MemoryType = MemoryType.WORKING
     importance: float = 0.5
-    timestamp: datetime = field(default_factory=datetime.now)
+    timestamp: datetime = Field(default_factory=datetime.now)
     access_count: int = 0
     last_accessed: Optional[datetime] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: Dict[str, Any] = Field(default_factory=dict)
     embedding: Optional[List[float]] = None
     
     # Decay tracking
@@ -37,6 +36,8 @@ class Memory:
     entropy_score: float = 0.5  # Information entropy
     relevance_score: float = 0.5  # Relevance to current context
     
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     @property
     def age_seconds(self) -> float:
         """Age of memory in seconds"""
@@ -58,10 +59,9 @@ class Memory:
         self.last_accessed = datetime.now()
         
         # Accessing reinforces the memory (reduces decay)
-        self.decay_score = max(0, self.decay_score - 0.1)
+        self.decay_score = max(0.0, self.decay_score - 0.1)
 
 
-@dataclass
 class CompressedMemory(Memory):
     """
     A memory that has been semantically compressed
@@ -70,15 +70,15 @@ class CompressedMemory(Memory):
     memory_type: MemoryType = MemoryType.COMPRESSED
     
     # Compression metadata
-    original_memories: List[str] = field(default_factory=list)  # IDs of original memories
+    original_memories: List[str] = Field(default_factory=list)  # IDs of original memories
     original_count: int = 0  # How many memories were compressed
     original_tokens: int = 0  # Token count before compression
     compressed_tokens: int = 0  # Token count after compression
     compression_ratio: float = 0.0  # Savings ratio
-    compression_timestamp: datetime = field(default_factory=datetime.now)
+    compression_timestamp: datetime = Field(default_factory=datetime.now)
     
     # Extracted structured facts
-    facts: List[Dict[str, str]] = field(default_factory=list)
+    facts: List[Dict[str, str]] = Field(default_factory=list)
     
     @property
     def tokens_saved(self) -> int:
@@ -93,23 +93,21 @@ class CompressedMemory(Memory):
         return (self.tokens_saved / self.original_tokens) * 100
 
 
-@dataclass
-class Message:
+class Message(BaseModel):
     """
     A conversational message (used for compression windows)
     """
     role: str  # "user" or "assistant"
     content: str
-    timestamp: datetime = field(default_factory=datetime.now)
+    timestamp: datetime = Field(default_factory=datetime.now)
     tokens: int = 0
-    message_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    message_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     
     def __str__(self):
         return f"[{self.role}]: {self.content}"
 
 
-@dataclass
-class CompressionWindow:
+class CompressionWindow(BaseModel):
     """
     A window of messages to be compressed
     """
@@ -117,7 +115,7 @@ class CompressionWindow:
     start_index: int
     end_index: int
     total_tokens: int
-    timestamp: datetime = field(default_factory=datetime.now)
+    timestamp: datetime = Field(default_factory=datetime.now)
     
     @property
     def message_count(self) -> int:
@@ -131,8 +129,7 @@ class CompressionWindow:
         return "\n".join(lines)
 
 
-@dataclass
-class CompressionResult:
+class CompressionResult(BaseModel):
     """
     Result of a compression operation
     """
@@ -148,8 +145,7 @@ class CompressionResult:
     compression_ratio: float = 0.0
 
 
-@dataclass
-class ConsolidationReport:
+class ConsolidationReport(BaseModel):
     """
     Report from a memory consolidation (sleep cycle)
     """
@@ -158,7 +154,7 @@ class ConsolidationReport:
     promotions: int = 0  # Promoted to archival
     deletions: int = 0
     duration_seconds: float = 0.0
-    timestamp: datetime = field(default_factory=datetime.now)
+    timestamp: datetime = Field(default_factory=datetime.now)
     
     def __str__(self):
         return (
@@ -171,8 +167,7 @@ class ConsolidationReport:
         )
 
 
-@dataclass
-class Outcome:
+class Outcome(BaseModel):
     """
     Outcome of a Vismriti action (for RL agent)
     """
@@ -181,7 +176,7 @@ class Outcome:
     retrieval_accuracy: float = 0.0  # 0-1
     information_loss: float = 0.0  # 0-1
     user_satisfaction: float = 0.5  # 0-1
-    timestamp: datetime = field(default_factory=datetime.now)
+    timestamp: datetime = Field(default_factory=datetime.now)
     
     def calculate_reward(self) -> float:
         """
@@ -205,8 +200,7 @@ class Outcome:
         return reward
 
 
-@dataclass
-class VismritiStats:
+class VismritiStats(BaseModel):
     """
     Statistics for Vismriti engine
     """

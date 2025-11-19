@@ -4,11 +4,34 @@ Drop-in replacement for ConversationBufferMemory with intelligent forgetting
 """
 
 from typing import Any, Dict, List
-from langchain.memory.chat_memory import BaseChatMemory
-from langchain.schema import BaseMessage, HumanMessage, AIMessage
 from pydantic import Field
-from vidurai import create_memory_system
 from loguru import logger
+from vidurai import create_memory_system
+
+# Robust import handling for LangChain (v0.3/v1.0 transition)
+try:
+    from langchain.memory.chat_memory import BaseChatMemory
+except ImportError:
+    try:
+        from langchain_classic.memory.chat_memory import BaseChatMemory
+    except ImportError:
+        # Fallback: try direct import (unlikely but possible in future)
+        try:
+             from langchain_community.chat_message_histories import ChatMessageHistory
+             # If we can't find BaseChatMemory, we can't inherit.
+             # We will define a dummy if docs generation, but raise here.
+             raise ImportError("Could not import BaseChatMemory. Please install langchain-classic or langchain<0.3")
+        except ImportError:
+             raise ImportError("Could not import BaseChatMemory. Please install langchain-classic")
+
+try:
+    from langchain.schema import BaseMessage, HumanMessage, AIMessage
+except ImportError:
+    try:
+        from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
+    except ImportError:
+        raise ImportError("Please install langchain-core")
+
 
 class ViduraiMemory(BaseChatMemory):
     """
@@ -162,7 +185,13 @@ class ViduraiConversationChain:
             
             response = chain.predict(input="Hello, my name is Alice")
         """
-        from langchain.chains import ConversationChain
+        try:
+            from langchain.chains import ConversationChain
+        except ImportError:
+            try:
+                from langchain_classic.chains import ConversationChain
+            except ImportError:
+                raise ImportError("Could not import ConversationChain. Please install langchain-classic")
         
         # ✨ ENHANCED: Create memory with aggressive option
         memory = ViduraiMemory(aggressive=aggressive)

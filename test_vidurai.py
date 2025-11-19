@@ -2,7 +2,15 @@
 Test LangChain Integration
 """
 from vidurai.integrations.langchain import ViduraiMemory, ViduraiConversationChain
-from langchain.schema import HumanMessage, AIMessage
+try:
+    from langchain.schema import HumanMessage, AIMessage
+except ImportError:
+    try:
+        from langchain_core.messages import HumanMessage, AIMessage
+    except ImportError:
+        # Fallback for testing
+        HumanMessage = lambda content: f"Human: {content}"
+        AIMessage = lambda content: f"AI: {content}"
 
 def test_vidurai_memory():
     """Test ViduraiMemory basic functionality"""
@@ -41,7 +49,13 @@ def test_conversation_chain():
     # We'll just test the creation, not actual LLM calls
     # since that requires API keys
     try:
-        from langchain.llms.fake import FakeListLLM
+        try:
+            from langchain.llms.fake import FakeListLLM
+        except ImportError:
+            try:
+                from langchain_community.llms import FakeListLLM
+            except ImportError:
+                from langchain_core.language_models.fake import FakeListLLM
         
         # Create a fake LLM for testing
         fake_llm = FakeListLLM(responses=["Hello!", "I remember!", "Goodbye!"])

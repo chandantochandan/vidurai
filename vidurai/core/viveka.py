@@ -4,12 +4,10 @@ Teaching AI to distinguish important from trivial
 """
 
 from typing import Dict, Any, List
-from dataclasses import dataclass
 from loguru import logger
-import re
+from pydantic import BaseModel, Field
 
-@dataclass
-class ImportanceFactors:
+class ImportanceFactors(BaseModel):
     """Factors that determine memory importance"""
     emotional_weight: float = 0.0
     goal_relevance: float = 0.0
