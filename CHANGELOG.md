@@ -38,7 +38,6 @@ The memory ledger functionality now works out of the box.
 - ✅ All v1.6.0 tests still pass (18/18)
 - ✅ Import and basic functionality verified
 
-जय विदुराई! 🕉️
 
 ---
 
@@ -200,13 +199,11 @@ All components include research citations in docstrings.
 **Testing:** Comprehensive automated test suite
 **Inspiration:** Vedantic philosophy, neuroscience, cognitive science
 
-जय विदुराई! 🕉️
 
 ---
 
 ## [1.5.2] - 2024-11-07 - "The Pickle Fix"
 
-**Developer:** Chandan + Claude Code
 **Type:** Patch Release (Critical Serialization Fix)
 
 ### Fixed
@@ -304,7 +301,6 @@ with open('session.pkl', 'rb') as f:
 
 See `LEARNINGS.md` for detailed technical analysis and design decisions.
 
-जय विदुराई! 🕉️
 
 ---
 
