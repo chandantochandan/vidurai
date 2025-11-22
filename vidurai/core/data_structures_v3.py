@@ -11,12 +11,13 @@ Research Foundation:
 """
 
 from enum import Enum
-from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional, Dict, Any
+import hashlib
+from pydantic import BaseModel, Field, model_validator, ConfigDict
 
 
-class SalienceLevel(Enum):
+class SalienceLevel(int, Enum):
     """
     Categorical salience levels based on dopamine tagging research
 
@@ -49,7 +50,7 @@ class SalienceLevel(Enum):
         return descriptions.get(self, "Unknown")
 
 
-class MemoryStatus(Enum):
+class MemoryStatus(str, Enum):
     """
     Memory lifecycle states
 
@@ -70,8 +71,7 @@ class MemoryStatus(Enum):
         return self.value.title()
 
 
-@dataclass
-class Memory:
+class Memory(BaseModel):
     """
     Dual-trace memory representation
 
@@ -104,31 +104,35 @@ class Memory:
     salience: SalienceLevel = SalienceLevel.MEDIUM
 
     # Temporal metadata
-    created_at: datetime = field(default_factory=datetime.now)
-    last_accessed: datetime = field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=datetime.now)
+    last_accessed: datetime = Field(default_factory=datetime.now)
     access_count: int = 0
 
     # State management
     status: MemoryStatus = MemoryStatus.ACTIVE
 
     # User-defined context
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: Dict[str, Any] = Field(default_factory=dict)
 
     # Neural correlate mapping (hypothetical)
     engram_id: Optional[str] = None           # Unique engram identifier
     anterior_hippocampus_weight: float = 0.7  # Gist processing weight
     posterior_hippocampus_weight: float = 0.3 # Detail processing weight
 
-    def __post_init__(self):
-        """Validate memory creation"""
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    @model_validator(mode='after')
+    def validate_memory(self) -> 'Memory':
+        """Validate memory creation and set engram_id"""
         if not self.verbatim and not self.gist:
             raise ValueError("Memory must have either verbatim or gist (or both)")
 
         # Auto-generate engram ID if not provided
         if self.engram_id is None:
-            import hashlib
             content = f"{self.verbatim}{self.gist}{self.created_at}"
             self.engram_id = hashlib.sha256(content.encode()).hexdigest()[:16]
+        
+        return self
 
     def access(self):
         """Record memory access (affects decay calculations)"""

@@ -5,7 +5,6 @@ Inspired by Vedantic philosophy of consciousness layers
 ✨ v2.0: Now with Intelligent Semantic Compression & RL Agent
 """
 
-from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 from collections import deque
@@ -13,6 +12,7 @@ import hashlib
 import json
 import time
 from loguru import logger
+from pydantic import BaseModel, Field, ConfigDict
 
 # ✨ NEW: Import v2 compression module
 try:
@@ -32,22 +32,17 @@ except ImportError:
     logger.warning("RL Agent module not available")
 
 
-@dataclass
-class Memory:
+class Memory(BaseModel):
     """Base memory unit with philosophical grounding"""
     content: str
     embedding: Optional[List[float]] = None
     importance: float = 0.5
-    timestamp: datetime = None
+    timestamp: datetime = Field(default_factory=datetime.now)
     access_count: int = 0
     dharma_score: float = 1.0  # Ethical alignment
-    metadata: Dict[str, Any] = None
-    
-    def __post_init__(self):
-        if self.timestamp is None:
-            self.timestamp = datetime.now()
-        if self.metadata is None:
-            self.metadata = {}
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
     
     @property
     def age(self) -> timedelta:
