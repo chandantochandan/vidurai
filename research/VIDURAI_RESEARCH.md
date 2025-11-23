@@ -5,7 +5,6 @@
 **Date:** November 2024
 **Version:** 1.0
 **License:** CC BY 4.0
-**arXiv:** [To be submitted - Q1 2026]
 
 ---
 
@@ -1174,7 +1173,6 @@ We thank the 10 developers who participated in our controlled experiments, the A
 
 This work was inspired by conversations at the intersection of philosophy, neuroscience, and AI—a reminder that ancient wisdom still has much to teach modern technology.
 
-**जय विदुराई!** 🕉️
 
 ---
 
@@ -1195,10 +1193,9 @@ Taittiriya Upanishad. (800-500 BCE). *Sanskrit text on Vedantic philosophy.*
 **Document Version:** 1.0
 **Last Updated:** November 13, 2024
 **License:** Creative Commons Attribution 4.0 (CC BY 4.0)
-**DOI:** [To be assigned upon publication]
 
 **Cite as:**
 ```
-Kumar, C. (2024). Vidurai: A Neuroscience-Inspired Memory Management System
-for AI-Assisted Software Development. arXiv preprint [To be submitted].
+Vidurai: A Neuroscience-Inspired Memory Management System
+for AI-Assisted Software Development.
 ```
