@@ -1,220 +1,310 @@
-# Vidurai: Autonomous Memory Optimization for LLMs
+<div align="center">
+  <img src="https://raw.githubusercontent.com/chandantochandan/vidurai/main/assets/brand/logo_primary_512.png" alt="Vidurai Logo" width="180" />
+  <h1>Vidurai</h1>
+  <p>Local-First Context Infrastructure & Semantic Compression Engine</p>
+</div>
 
-[![PyPI version](https://badge.fury.io/py/vidurai.svg)](https://badge.fury.io/py/vidurai)
-[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-
-**Vidurai** is a reinforcement-learning (RL) powered memory management system designed to optimize Large Language Model (LLM) context windows. It reduces API costs and latency by dynamically compressing, prioritizing, and discarding information based on relevance and utility.
-
-> 🚨 **v1.5.1 Released (2025-11-03)** - Critical bug fixes for token accumulation and recall reliability.
-
----
-
-## 🚀 Core Value Proposition
-
-Standard RAG (Retrieval-Augmented Generation) or buffer memories often lead to:
-*   **High Latency:** Processing large context windows takes longer.
-*   **Increased Costs:** Charges are per-token; redundant history wastes budget.
-*   **Context Noise:** Irrelevant history degrades model performance ("lost in the middle" phenomenon).
-
-**Vidurai addresses these by:**
-1.  **Reducing Token Usage:** Achieving **36-47% reduction** in context tokens through semantic compression and intelligent decay.
-2.  **Improving Relevance:** Using an RL agent to learn optimal retention strategies based on conversation patterns.
-3.  **Hierarchical Storage:** separating immediate context, episodic history, and distilled knowledge.
+[![PyPI version](https://img.shields.io/pypi/v/vidurai.svg)](https://pypi.org/project/vidurai/)
+![Python versions](https://img.shields.io/pypi/pyversions/vidurai.svg)
+[![License](https://img.shields.io/pypi/l/vidurai.svg)](https://github.com/chandantochandan/vidurai/blob/main/LICENSE)
 
 ---
 
-## 🏗️ Technical Architecture
+Vidurai is **local-first context middleware** that solves the *context window bottleneck* in LLM-driven workflows.
 
-Vidurai implements a three-tier memory hierarchy to balance access speed, retention, and cost:
+It sits between **developer environments** (IDE, terminal, browser) and **AI models**, ingesting high-velocity telemetry (file edits, terminal commands, AI chats), normalizing it via a **Shared Event Schema**, and applying **SF-V2 semantic compression** to maintain a **high-signal temporal graph** of a project.
 
-### 1. Working Memory (Buffer)
-*   **Function:** High-speed, short-term storage for immediate conversational coherence.
-*   **Mechanism:** Sliding window buffer with time-to-live (TTL) expiration.
-*   **Capacity:** Typically holds the last N messages (configurable).
-
-### 2. Episodic Memory (Cache)
-*   **Function:** Storage for recent interaction history with intelligent decay.
-*   **Mechanism:** Least Recently Used (LRU) eviction policy weighted by "Importance Scores".
-*   **Decay:** Content fades over time based on usage frequency and relevance, not just age.
-
-### 3. Archival Memory (Knowledge Base)
-*   **Function:** Long-term storage for high-value information.
-*   **Mechanism:** Semantic compression (summarization) and vector-based retrieval.
-*   **Persistence:** Designed for cross-session persistence and knowledge graph connections.
+**Core capability:**
+Reduce tokens by 50–70% for AI prompts while preserving 100% of critical technical entities (file paths, stack traces, function names).
 
 ---
 
-## 🧠 Reinforcement Learning Engine
+## 1. Engineering Problem
 
-The core differentiator is the **RL Optimization Agent (Q-Learning)**, which autonomously manages the trade-off between token savings and information preservation.
+Raw developer activity is high-entropy:
 
-*   **State Space:** Observes current context size, redundancy levels, and user interaction patterns.
-*   **Action Space:** Decides when to:
-    *   `COMPRESS_NOW`: Trigger semantic summarization.
-    *   `COMPRESS_AGGRESSIVE`: High-loss, high-savings compression.
-    *   `COMPRESS_CONSERVATIVE`: Low-loss, minimal savings.
-    *   `DO_NOTHING`: Accumulate more context.
-*   **Reward Function:** Penalizes information loss while rewarding token reduction.
+- **IDE:** rapid file saves, refactors, and diagnostics
+- **Terminal:** command spam, noisy logs
+- **Browser:** ad-hoc AI chats with half-remembered context
 
----
+Feeding these directly into an LLM causes:
 
-## ⚔️ Vidurai vs. Mem0: The Anti-Bloat Alternative
+1. **Context saturation** – token limits hit long before the real history is represented.
+2. **State fragmentation** – VS Code, terminal, and browser all have partial views.
+3. **Hallucinations** – the model optimizes on recent noise instead of actual project state.
+4. **Runaway cost** – you pay for the same story over and over again.
 
-Vidurai is the **philosophical and architectural mirror image** of [Mem0](https://github.com/mem0ai/mem0).
-
-Where Mem0 seeks to *add* complexity, Vidurai seeks to *subtract* it.
-
-| Feature | Mem0 (The "More is Better" Approach) | Vidurai (The "Less is More" Approach) |
-|:---|:---|:---|
-| **Primary Goal** | **Maximize Retention:** Build complex user profiles, knowledge graphs, and relationship maps. | **Minimize Cost:** Ruthlessly prune, compress, and discard tokens to fit budgets. |
-| **Mechanism** | **Additive:** Injects *more* tokens from external Vector/Graph DBs into your prompt. | **Subtractive:** Removes redundant tokens from your existing context using RL. |
-| **Infrastructure** | **Heavy:** Requires Vector DBs (Qdrant/Pinecone) + Graph DBs (Neo4j). | **Lightweight:** Pure Python + Local File/SQLite. No external dependencies. |
-| **Cost Impact** | 💸 **Increases Costs:** Retrieved context *adds* to your input token bill. | 💰 **Slashes Costs:** Compression *reduces* your input token bill by ~40%. |
-| **Philosophy** | *"Remember everything, even the noise."* | *"Forget the noise, keep the signal."* |
-
-**The Verdict:**
-If you want to build a "Her"-like companion that remembers your childhood pet's name to build emotional rapport, use **Mem0**.
-If you want to build a production LLM application that doesn't bankrupt you on API costs while maintaining context fidelity, use **Vidurai**.
-
-**Vidurai strips away the "memory decorations"—graphs, relationship mapping, and psychological profiling—to focus on the only metric that matters in production: Information Density per Dollar.**
+**Vidurai's role:**
+Act as a **local context layer** that continuously ingests signals, compresses them into durable "episodes", and serves **audience-specific context** back to tools and agents on demand.
 
 ---
 
-## 📦 Installation
+## 2. Architecture Overview (v2.0.0)
+
+```text
+       [VS Code]      [Browser UI]         [Terminal]
+           │               │                   │
+      (WebSocket)     (WebSocket)           (StdOut)
+           │               │                   │
+           ▼               ▼                   ▼
+    ┌────────────────────────────────────────────────┐
+    │              Vidurai Daemon (Local)            │
+    │  [Normalizer] → [SF-V2 Engine] → [SQLite/WAL]  │
+    └───────────────────────┬────────────────────────┘
+                            │  (HTTP / JSON)
+                ┌───────────┴───────────┐
+                ▼                       ▼
+          [Python SDK / CLI]      [LLM Proxy]
+        (Context Retrieval)     (Prompt Injection)
+```
+
+### Components
+
+#### 1. Vidurai SDK (this package)
+
+- Pydantic models for the Shared Event Schema
+- SF-V2 semantic compression engine
+- Local project client (`VismritiMemory`)
+- CLI tooling (`vidurai …`)
+
+#### 2. Vidurai Daemon (hub service)
+
+- **Stack:** Python 3.9+, FastAPI, AsyncIO
+- Runs on `localhost:7777`
+- Ingests events from VS Code / Browser / CLI
+- Performs entity extraction (paths, symbols, errors, IDs)
+- Applies SF-V2 scoring + consolidation
+- Persists to SQLite (`~/.vidurai/vidurai.db`, WAL mode)
+
+#### 3. VS Code Extension (sensor)
+
+- Watches file edits, terminal commands, and diagnostics
+- Emits structured `ViduraiEvent` messages to the daemon
+- Exposes "Copy Context for AI" command for one-click prompt injection
+
+#### 4. Browser Extension (sensor)
+
+- Targets AI chat UIs (ChatGPT, Claude, Gemini, etc.)
+- Captures prompts + responses as events
+- Injects Vidurai context into new chats via hotkey / UI actions
+
+#### 5. LLM Proxy (optional)
+
+- HTTP proxy around LLM APIs
+- Automatically attaches Vidurai gists to outbound prompts
+- Enables context-aware CLI tools, scripts, or agents
+
+---
+
+## 3. Shared Event Schema
+
+All tools speak the same language: `ViduraiEvent`.
+
+```json
+{
+  "schema_version": "vidurai-events-v1",
+  "event_id": "d8c8a3f2-9c25-4e2a-9a4d-3f2e91f4b7a1",
+  "timestamp": "2025-11-26T18:30:00.123Z",
+  "source": "vscode",
+  "channel": "human",
+  "kind": "file_edit",
+  "project_root": "/home/user/vidurai",
+  "project_id": "proj_8f21b9a0",
+  "session_id": "sess_02c9b1d4",
+  "payload": {
+    "file_path": "vidurai/core/sf_v2.py",
+    "language": "python",
+    "change_type": "modified",
+    "summary": "Refactor scoring function"
+  }
+}
+```
+
+Backed by:
+
+- **Python:** `vidurai.shared.events` (`ViduraiEvent`, `EventKind`, etc.)
+- **TypeScript:** `src/shared/events.ts` in VS Code + browser extensions
+
+This schema is the contract between all sensors and the daemon.
+
+---
+
+## 4. SF-V2 Semantic Compression
+
+Vidurai does not append logs forever.
+
+SF-V2 runs a deterministic pipeline:
+
+1. **Window selection** – select a time/window slice of events for a project.
+2. **Role classification** – label events as `CAUSE`, `ATTEMPT`, `FIX`, `NOISE`, etc.
+3. **Scoring** – compute retention scores using recency, frequency, and structural importance.
+4. **Consolidation** – merge low-value events into summaries while preserving hard entities (paths, line numbers, symbols, IDs).
+5. **Episode creation** – store high-density "episodes" that reflect how the project changed.
+
+Outputs are then exposed as **gists**:
+
+| Audience | Purpose |
+|----------|---------|
+| `AI` | token-bounded, machine-optimized context for LLM calls |
+| `DEVELOPER` | richer textual summary for humans |
+| `MANAGER` / `STAKEHOLDER` | higher-level progress narratives |
+
+---
+
+## 5. Security & Data Governance
+
+Vidurai is built for zero-trust environments:
+
+### Local-first storage
+
+- Data lives in `~/.vidurai/` by default (SQLite + JSONL ledgers).
+- No mandatory cloud component.
+
+### Ingestion-time redaction
+
+- Pluggable regex filters to mask API keys, tokens, and secrets before persistence.
+
+### Transparency
+
+- Every compression / deletion decision is logged to a `forgetting_ledger.jsonl` for audit and debugging.
+- Nothing leaves the machine unless you explicitly configure a remote proxy or sync mechanism.
+
+---
+
+## 6. Installation & Deployment
+
+### 6.1 Python SDK
 
 ```bash
 pip install vidurai
 ```
 
+Requires Python 3.9+.
+
+### 6.2 Daemon (recommended: Docker)
+
+```bash
+docker run --rm -d \
+  -p 7777:7777 \
+  -v ~/.vidurai:/root/.vidurai \
+  chandantochandan/vidurai-daemon:2.0.0
+```
+
+This starts the Vidurai Daemon on `http://localhost:7777` with persistent state in `~/.vidurai`.
+
+### 6.3 Optional: LLM Proxy
+
+```bash
+docker run --rm -d \
+  -p 9999:9999 \
+  -v ~/.vidurai:/root/.vidurai \
+  chandantochandan/vidurai-proxy:2.0.0
+```
+
+Use this if you want Vidurai gists automatically injected into outbound LLM API calls.
+
 ---
 
-## 💻 Usage
-
-### Basic Initialization
-
-Zero-configuration setup using default optimization policies.
+## 7. SDK Usage Example
 
 ```python
-from vidurai import Vidurai
+from vidurai.vismriti_memory import VismritiMemory
 
-# Initialize memory system
-memory = Vidurai()
+# 1. Initialize memory for a project
+memory = VismritiMemory(project_path=".")
 
-# Add context (System automatically evaluates importance)
+# 2. Store a memory with automatic salience detection
 memory.remember(
-    session_id="user123",
-    content="User is configuring a Kubernetes cluster on AWS."
-)
-memory.remember(
-    session_id="user123",
-    content="Thinking about node instance types."
+    gist="Refactored authentication module to use JWT tokens",
+    tags=["refactor", "auth", "jwt"],
+    metadata={"file": "auth/jwt_handler.py", "line": 42}
 )
 
-# Retrieval (Returns top-k relevant results)
-context = memory.recall(
-    session_id="user123",
-    query="What infrastructure provider?"
+# 3. Recall relevant context
+results = memory.recall(
+    query="authentication implementation",
+    limit=5
 )
-# Result: "User is configuring a Kubernetes cluster on AWS."
+
+for mem in results:
+    print(f"[{mem.salience}] {mem.gist}")
+
+# 4. Get compressed context for AI prompt injection
+context = memory.get_context(
+    query="current auth flow",
+    max_tokens=2000
+)
+
+print(f"Injecting context into LLM prompt:")
+print(context)
 ```
 
-### Advanced: Custom RL Training
+Typical uses:
 
-For specialized domains, you can pre-train the RL agent on your specific conversation datasets.
-
-```python
-from vidurai.core.vismriti import VismritiRLAgent
-
-# Configure RL hyperparameters
-rl_agent = VismritiRLAgent(
-    learning_rate=0.1,
-    discount_factor=0.95,
-    exploration_rate=0.1
-)
-
-# Train on domain-specific episodes
-rl_agent.train(episodes=1000, verbose=True)
-
-# Initialize Vidurai with the trained agent
-memory = Vidurai(compression_agent=rl_agent)
-```
-
-### Handling Token Limits
-
-To aggressively manage costs in high-throughput environments:
-
-```python
-from vidurai import ViduraiMemory
-
-# Enable aggressive decay for non-critical memories
-memory = ViduraiMemory(
-    decay_rate=0.90,     # Faster decay (default 0.95)
-    enable_decay=True
-)
-
-# Retrieve only high-salience memories
-critical_context = memory.recall(min_importance=0.7)
-```
+- Pre-pend context to prompts for ChatGPT/Claude/Gemini.
+- Feed specialized gists into autonomous agents / tools.
+- Generate manager-friendly status summaries.
 
 ---
 
-## 📊 Performance & Benchmarks
+## 8. Integrations
 
-### Cost Analysis (per 10k Users)
+### VS Code Extension
 
-| Metric | Standard Buffer | RAG (Naive) | Vidurai (RL Optimized) |
-|--------|-----------------|-------------|------------------------|
-| **Daily Token Load** | 1.11B | 834M | **585M** |
-| **Daily Cost** | $24,300 | $18,225 | **$8,118** |
-| **Relevance Score** | 30% | 55% | **85%** |
+- **Marketplace ID:** `vidurai.vidurai`
+- Sends `file_edit`, `terminal_command`, and `diagnostics` events to the daemon.
+- Provides "Copy Vidurai Context" command for pasting into AI chats.
 
-*Estimates based on Claude 3.5 Sonnet pricing ($3 input / $15 output).*
+### Browser Extension
 
-### Token Reduction Metrics
-*   **Working Set Reduction:** ~36% immediate reduction in prompt size.
-*   **Long-term Storage:** ~90% reduction via semantic compression of historical logs.
-*   **Semantic Fidelity:** >0.94 cosine similarity maintained between original and compressed context.
+- Chrome MV3 extension (Universal AI Context).
+- Targets major AI UIs (ChatGPT, Claude, Gemini, etc.).
+- Can inject Vidurai context into new conversations.
 
----
+### CLI / Scripts
 
-## 🛠 Configuration & Limitations
-
-### File Storage
-*   **Current:** Local JSONL/JSON file-based persistence (`~/.vidurai/`).
-*   **Scale limit:** Efficient up to ~100k experiences.
-*   **Roadmap:** SQLite/Postgres backend (v1.6.0).
-
-### Recall Thresholds
-Due to the decay mechanism, raw importance scores decrease over time. When querying for older memories, adjust thresholds accordingly:
-*   **Recent:** `min_importance=0.7`
-*   **Mid-term:** `min_importance=0.4`
-*   **Long-term:** `min_importance=0.3`
+- Use the SDK or HTTP API to pull audience-specific gists and attach them to prompts in custom tools or agents.
 
 ---
 
-## 🤝 Integrations
+## 9. Versioning & Legacy RL Engine
 
-### LangChain
-Vidurai provides a drop-in replacement for LangChain's memory components.
+- **Current release:** v2.0.0 – unified architecture around SF-V2 + shared events.
+- **Legacy RL-based v1.x:** preserved for reference in `docs/archive/implementation/`.
 
-```python
-from vidurai.integrations.langchain import ViduraiMemory
-from langchain.chains import ConversationChain
-from langchain_openai import ChatOpenAI
+The v2 line focuses on deterministic semantic compression and event-driven context, not on generic RL experimentation.
 
-llm = ChatOpenAI(temperature=0)
-memory = ViduraiMemory(session_id="test-session")
+---
 
-conversation = ConversationChain(
-    llm=llm, 
-    memory=memory,
-    verbose=True
-)
+## 10. Repository Layout
+
+```
+vidurai/                     # Python SDK (this package)
+vidurai-daemon/              # Local hub service
+vidurai-vscode-extension/    # VS Code telemetry extension
+vidurai-browser-extension/   # Browser AI context extension
+vidurai-proxy/               # Optional LLM proxy
+tests/                       # SDK tests
+docs/                        # Documentation
+  └── archive/
+      └── implementation/    # Historical PHASE_* docs
+ARCHITECTURE_OVERVIEW.md     # High-level system architecture
+CHANGELOG.md                 # Version history
 ```
 
 ---
 
-## 📄 License
+## 11. Links
 
-MIT License. See [LICENSE](LICENSE) for details.
+- **Website:** https://vidurai.ai
+- **Docs:** https://docs.vidurai.ai
+- **Source:** https://github.com/chandantochandan/vidurai
+- **Issues:** https://github.com/chandantochandan/vidurai/issues
+- **Docker Hub:** https://hub.docker.com/u/chandantochandan
+
+---
+
+## 12. License
+
+Vidurai is released under the **MIT License**.
+See the [LICENSE](https://github.com/chandantochandan/vidurai/blob/main/LICENSE) file for details.

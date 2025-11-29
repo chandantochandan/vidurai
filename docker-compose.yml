@@ -1,0 +1,43 @@
+# Vidurai Docker Compose v2.0.0
+# Build and run all Vidurai services
+
+version: '3.8'
+
+services:
+  daemon:
+    build:
+      context: .
+      dockerfile: vidurai-daemon/Dockerfile
+    image: vidurai-daemon:2.0.0
+    container_name: vidurai-daemon
+    ports:
+      - "7777:7777"
+    volumes:
+      - vidurai-data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7777/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  proxy:
+    build:
+      context: .
+      dockerfile: vidurai-proxy/Dockerfile
+    image: vidurai-proxy:2.0.0
+    container_name: vidurai-proxy
+    ports:
+      - "9999:9999"
+    environment:
+      - VIDURAI_HOST=0.0.0.0
+      - VIDURAI_PORT=9999
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9999/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  vidurai-data:

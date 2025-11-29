@@ -37,7 +37,7 @@ memory = ViduraiMemory()
 
 # Add multiple messages
 for i in range(20):
-    memory.remember(f"Message {i}: Some content here", importance=0.8)
+ memory.remember(f"Message {i}: Some content here", importance=0.8)
 
 # Check token count before and after compression
 # Should show reduction, not increase
@@ -83,17 +83,17 @@ results = memory.recall(min_importance=0.7)
 **Option 2 - Slower Decay Rate:**
 ```python
 # Use slower decay for longer memory retention
-memory = ViduraiMemory(decay_rate=0.98)  # Instead of 0.95
+memory = ViduraiMemory(decay_rate=0.98) # Instead of 0.95
 
 # After 20 messages:
-# - Original (0.95): 0.95 × (0.95^19) ≈ 0.34 ❌ (falls below 0.5)
-# - Slower (0.98): 0.95 × (0.98^19) ≈ 0.64 ✅ (stays above 0.5)
+# - Original (0.95): 0.95 × (0.95^19) ≈ 0.34 (falls below 0.5)
+# - Slower (0.98): 0.95 × (0.98^19) ≈ 0.64 (stays above 0.5)
 ```
 
 **Option 3 - Lower Thresholds:**
 ```python
 # Use thresholds that work reliably with default decay
-memory = ViduraiMemory()  # Default decay_rate=0.95
+memory = ViduraiMemory() # Default decay_rate=0.95
 
 # Use min_importance between 0.3-0.5 for reliable recall
 important_memories = memory.recall(min_importance=0.4)
@@ -109,7 +109,7 @@ memory.remember("Test memory", importance=0.9)
 
 # Add 20 filler messages
 for i in range(20):
-    memory.remember(f"Filler {i}", importance=0.3)
+ memory.remember(f"Filler {i}", importance=0.3)
 
 # Should still recall the high-importance memory
 results = memory.recall(min_importance=0.7)
@@ -133,8 +133,8 @@ assert any(m.importance >= 0.9 for m in results), "Importance should be preserve
 **Fix (v1.5.1):**
 1. Removed pricing multiplier, using direct token scaling: `(tokens_saved / 10) * weight`
 2. Adjusted profile weights:
-   - COST_FOCUSED: `token_weight=3.0`, `loss_penalty=0.5`
-   - QUALITY_FOCUSED: `token_weight=0.3`, `loss_penalty=5.0`
+ - COST_FOCUSED: `token_weight=3.0`, `loss_penalty=0.5`
+ - QUALITY_FOCUSED: `token_weight=0.3`, `loss_penalty=5.0`
 
 **Verification:**
 ```python
@@ -183,20 +183,20 @@ print(f"Epsilon: {stats['epsilon']:.3f}")
 **Causes & Solutions:**
 
 1. **Not enough episodes**
-   - Need: 50-100 episodes for basic learning, 1000+ for maturity
-   - Solution: Process more conversations or use synthetic training data
+ - Need: 50-100 episodes for basic learning, 1000+ for maturity
+ - Solution: Process more conversations or use synthetic training data
 
 2. **Persistence not working**
-   - Check: `~/.vidurai/` directory exists and is writable
-   - Solution: Ensure proper file permissions
-   ```bash
-   ls -la ~/.vidurai/
-   # Should show experiences.jsonl and q_table.json
-   ```
+ - Check: `~/.vidurai/` directory exists and is writable
+ - Solution: Ensure proper file permissions
+ ```bash
+ ls -la ~/.vidurai/
+ # Should show experiences.jsonl and q_table.json
+ ```
 
 3. **Experience buffer not persisting**
-   - Check file size: `ls -lh ~/.vidurai/experiences.jsonl`
-   - Solution: Verify write permissions and disk space
+ - Check file size: `ls -lh ~/.vidurai/experiences.jsonl`
+ - Solution: Verify write permissions and disk space
 
 ---
 
@@ -218,7 +218,7 @@ vidurai_dir = os.path.expanduser("~/.vidurai/")
 
 # Backup current state
 shutil.copy(f"{vidurai_dir}/experiences.jsonl",
-            f"{vidurai_dir}/experiences_backup.jsonl")
+ f"{vidurai_dir}/experiences_backup.jsonl")
 
 # Clear experience buffer
 os.remove(f"{vidurai_dir}/experiences.jsonl")
@@ -229,15 +229,15 @@ os.remove(f"{vidurai_dir}/experiences.jsonl")
 2. **Automated cleanup (add to your code):**
 ```python
 def cleanup_experiences_if_needed(max_size_mb=10):
-    import os
-    exp_file = os.path.expanduser("~/.vidurai/experiences.jsonl")
+ import os
+ exp_file = os.path.expanduser("~/.vidurai/experiences.jsonl")
 
-    if os.path.exists(exp_file):
-        size_mb = os.path.getsize(exp_file) / (1024 * 1024)
-        if size_mb > max_size_mb:
-            # Keep Q-table, clear experiences
-            os.remove(exp_file)
-            print(f"Cleared experience buffer ({size_mb:.1f}MB)")
+ if os.path.exists(exp_file):
+ size_mb = os.path.getsize(exp_file) / (1024 * 1024)
+ if size_mb > max_size_mb:
+ # Keep Q-table, clear experiences
+ os.remove(exp_file)
+ print(f"Cleared experience buffer ({size_mb:.1f}MB)")
 
 # Call before initializing memory
 cleanup_experiences_if_needed()
@@ -266,16 +266,16 @@ memory = ViduraiMemory()
 **Possible Causes:**
 
 1. **RL agent in exploration phase**
-   - First 10-20 episodes have 30% exploration (epsilon=0.30)
-   - Solution: Be patient, agent learns over time
+ - First 10-20 episodes have 30% exploration (epsilon=0.30)
+ - Solution: Be patient, agent learns over time
 
 2. **Content too short to compress**
-   - Need minimum context size (typically 500+ tokens)
-   - Solution: Accumulate more messages before expecting compression
+ - Need minimum context size (typically 500+ tokens)
+ - Solution: Accumulate more messages before expecting compression
 
 3. **LLM client not configured**
-   - Check if compression LLM is available
-   - Solution: Configure OpenAI or Anthropic API keys
+ - Check if compression LLM is available
+ - Solution: Configure OpenAI or Anthropic API keys
 
 ---
 
@@ -321,41 +321,41 @@ memory = ViduraiMemory(enable_rl_agent=False)
 from vidurai.core import ViduraiMemory
 
 def health_check():
-    memory = ViduraiMemory()
+ memory = ViduraiMemory()
 
-    # Test 1: Basic remember/recall
-    memory.remember("Test memory", importance=0.8)
-    results = memory.recall()
-    assert len(results) > 0, "❌ Basic recall failed"
-    print("✅ Basic remember/recall working")
+ # Test 1: Basic remember/recall
+ memory.remember("Test memory", importance=0.8)
+ results = memory.recall()
+ assert len(results) > 0, " Basic recall failed"
+ print(" Basic remember/recall working")
 
-    # Test 2: Importance decay (with decay enabled)
-    memory_with_decay = ViduraiMemory(enable_decay=True, decay_rate=0.95)
-    memory_with_decay.remember("Decay test", importance=0.9)
+ # Test 2: Importance decay (with decay enabled)
+ memory_with_decay = ViduraiMemory(enable_decay=True, decay_rate=0.95)
+ memory_with_decay.remember("Decay test", importance=0.9)
 
-    for i in range(20):
-        memory_with_decay.remember(f"Filler {i}", importance=0.3)
+ for i in range(20):
+ memory_with_decay.remember(f"Filler {i}", importance=0.3)
 
-    results = memory_with_decay.recall(min_importance=0.7)
-    # Should have decayed below 0.7
-    print(f"✅ Decay working (recalled {len(results)} items)")
+ results = memory_with_decay.recall(min_importance=0.7)
+ # Should have decayed below 0.7
+ print(f" Decay working (recalled {len(results)} items)")
 
-    # Test 3: Decay disabled
-    memory_no_decay = ViduraiMemory(enable_decay=False)
-    memory_no_decay.remember("No decay test", importance=0.9)
+ # Test 3: Decay disabled
+ memory_no_decay = ViduraiMemory(enable_decay=False)
+ memory_no_decay.remember("No decay test", importance=0.9)
 
-    for i in range(20):
-        memory_no_decay.remember(f"Filler {i}", importance=0.3)
+ for i in range(20):
+ memory_no_decay.remember(f"Filler {i}", importance=0.3)
 
-    results = memory_no_decay.recall(min_importance=0.7)
-    assert len(results) > 0, "❌ Decay disable failed"
-    print(f"✅ Decay disabled working (recalled {len(results)} items)")
+ results = memory_no_decay.recall(min_importance=0.7)
+ assert len(results) > 0, " Decay disable failed"
+ print(f" Decay disabled working (recalled {len(results)} items)")
 
-    # Test 4: RL agent stats
-    stats = memory.get_rl_agent_stats()
-    print(f"✅ RL Agent: {stats['episodes']} episodes, epsilon={stats['epsilon']:.3f}")
+ # Test 4: RL agent stats
+ stats = memory.get_rl_agent_stats()
+ print(f" RL Agent: {stats['episodes']} episodes, epsilon={stats['epsilon']:.3f}")
 
-    print("\n✅ All health checks passed!")
+ print("\n All health checks passed!")
 
 health_check()
 ```
@@ -370,34 +370,34 @@ health_check()
 import tiktoken
 
 def benchmark_token_reduction():
-    encoder = tiktoken.encoding_for_model("gpt-3.5-turbo")
-    memory = ViduraiMemory()
+ encoder = tiktoken.encoding_for_model("gpt-3.5-turbo")
+ memory = ViduraiMemory()
 
-    # Add substantial content
-    conversation = [
-        "Let me think about this problem carefully. Hmm, well, you know...",
-        "Actually, I think the answer might be related to machine learning.",
-        "Yeah, so basically, neural networks learn patterns from data.",
-        # ... add more realistic conversation content
-    ]
+ # Add substantial content
+ conversation = [
+ "Let me think about this problem carefully. Hmm, well, you know...",
+ "Actually, I think the answer might be related to machine learning.",
+ "Yeah, so basically, neural networks learn patterns from data.",
+ # ... add more realistic conversation content
+ ]
 
-    initial_tokens = 0
-    for msg in conversation:
-        initial_tokens += len(encoder.encode(msg))
-        memory.remember(msg, importance=0.5)
+ initial_tokens = 0
+ for msg in conversation:
+ initial_tokens += len(encoder.encode(msg))
+ memory.remember(msg, importance=0.5)
 
-    # Trigger compression (may need more messages)
-    # ... add enough content for compression to occur
+ # Trigger compression (may need more messages)
+ # ... add enough content for compression to occur
 
-    # Measure final token count
-    final_tokens = 0
-    recalled = memory.recall()
-    for m in recalled:
-        final_tokens += len(encoder.encode(m.content))
+ # Measure final token count
+ final_tokens = 0
+ recalled = memory.recall()
+ for m in recalled:
+ final_tokens += len(encoder.encode(m.content))
 
-    reduction = ((initial_tokens - final_tokens) / initial_tokens) * 100
-    print(f"Token reduction: {reduction:.1f}%")
-    print(f"Initial: {initial_tokens} → Final: {final_tokens}")
+ reduction = ((initial_tokens - final_tokens) / initial_tokens) * 100
+ print(f"Token reduction: {reduction:.1f}%")
+ print(f"Initial: {initial_tokens} → Final: {final_tokens}")
 
 benchmark_token_reduction()
 ```
@@ -409,28 +409,28 @@ benchmark_token_reduction()
 If you're still experiencing issues:
 
 1. **Check version:** Ensure you're on v1.5.1+
-   ```bash
-   pip show vidurai
-   ```
+ ```bash
+ pip show vidurai
+ ```
 
 2. **Enable debug logging:**
-   ```python
-   import logging
-   logging.basicConfig(level=logging.DEBUG)
-   ```
+ ```python
+ import logging
+ logging.basicConfig(level=logging.DEBUG)
+ ```
 
 3. **Gather diagnostics:**
-   ```python
-   stats = memory.get_rl_agent_stats()
-   print(f"Episodes: {stats['episodes']}")
-   print(f"Epsilon: {stats['epsilon']}")
-   print(f"Q-table size: {stats['q_table_size']}")
-   ```
+ ```python
+ stats = memory.get_rl_agent_stats()
+ print(f"Episodes: {stats['episodes']}")
+ print(f"Epsilon: {stats['epsilon']}")
+ print(f"Q-table size: {stats['q_table_size']}")
+ ```
 
 4. **Report issues:**
-   - GitHub Issues: https://github.com/chandantochandan/vidurai/issues
-   - Include: Version, error messages, reproduction steps
-   - **Do not include:** API keys, sensitive data
+ - GitHub Issues: https://github.com/chandantochandan/vidurai/issues
+ - Include: Version, error messages, reproduction steps
+ - **Do not include:** API keys, sensitive data
 
 ---
 

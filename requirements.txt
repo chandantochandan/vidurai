@@ -19,6 +19,16 @@ pytest-cov>=4.1.0
 # API & SDK
 fastapi>=0.104.0
 pydantic>=2.0.0
+uvicorn>=0.24.0
+
+# File Watching
+watchdog>=3.0.0
+
+# Git Operations
+gitpython>=3.1.0
+
+# Configuration Parsing
+toml>=0.10.2
 
 # Utilities
 numpy>=1.24.0

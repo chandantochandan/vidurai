@@ -1,464 +1,338 @@
 Metadata-Version: 2.4
 Name: vidurai
-Version: 1.6.1
-Summary: Self-learning AI memory system with RL-based compression - Intelligence emerges from experience, not rules
-Home-page: https://github.com/chandantochandan/vidurai
-Author: Chandan
-Author-email: yvidurai@gmail.com
+Version: 2.0.0
+Summary: Vidurai — Local-First Context Infrastructure & Semantic Compression Engine
+Author: Chandan Kumar
+License-Expression: MIT
 Project-URL: Homepage, https://vidurai.ai
 Project-URL: Documentation, https://docs.vidurai.ai
-Project-URL: Source Code, https://github.com/chandantochandan/vidurai
+Project-URL: Source, https://github.com/chandantochandan/vidurai
 Project-URL: Bug Tracker, https://github.com/chandantochandan/vidurai/issues
-Project-URL: Discord, https://discord.gg/DHdgS8eA
 Project-URL: Changelog, https://github.com/chandantochandan/vidurai/blob/main/CHANGELOG.md
-Keywords: ai memory reinforcement-learning rl-agent semantic-compression llm langchain llamaindex vedantic forgetting consciousness kosha vismriti q-learning
-Classifier: Development Status :: 4 - Beta
+Classifier: Development Status :: 5 - Production/Stable
 Classifier: Intended Audience :: Developers
-Classifier: Topic :: Scientific/Engineering :: Artificial Intelligence
-Classifier: Topic :: Software Development :: Libraries :: Python Modules
-Classifier: License :: OSI Approved :: MIT License
 Classifier: Programming Language :: Python :: 3
-Classifier: Programming Language :: Python :: 3.8
 Classifier: Programming Language :: Python :: 3.9
 Classifier: Programming Language :: Python :: 3.10
 Classifier: Programming Language :: Python :: 3.11
-Classifier: Programming Language :: Python :: 3.12
 Classifier: Operating System :: OS Independent
-Requires-Python: >=3.8
+Classifier: Environment :: Console
+Classifier: Topic :: Software Development :: Libraries
+Classifier: Topic :: Software Development :: Libraries :: Python Modules
+Classifier: Topic :: Scientific/Engineering :: Artificial Intelligence
+Requires-Python: >=3.9
 Description-Content-Type: text/markdown
+Requires-Dist: pydantic>=2.0.0
+Requires-Dist: watchdog>=3.0.0
 Requires-Dist: loguru>=0.7.0
-Requires-Dist: pandas>=1.3.0
-Provides-Extra: rl
-Requires-Dist: sentence-transformers>=2.2.0; extra == "rl"
-Provides-Extra: openai
-Requires-Dist: openai>=1.0.0; extra == "openai"
-Provides-Extra: anthropic
-Requires-Dist: anthropic>=0.18.0; extra == "anthropic"
-Provides-Extra: langchain
-Requires-Dist: langchain>=0.1.0; extra == "langchain"
-Requires-Dist: langchain-community>=0.0.1; extra == "langchain"
-Provides-Extra: llamaindex
-Requires-Dist: llama-index>=0.9.0; extra == "llamaindex"
-Provides-Extra: all
-Requires-Dist: pandas>=1.3.0; extra == "all"
-Requires-Dist: sentence-transformers>=2.2.0; extra == "all"
-Requires-Dist: openai>=1.0.0; extra == "all"
-Requires-Dist: anthropic>=0.18.0; extra == "all"
-Requires-Dist: langchain>=0.1.0; extra == "all"
-Requires-Dist: langchain-community>=0.0.1; extra == "all"
-Requires-Dist: llama-index>=0.9.0; extra == "all"
-Provides-Extra: dev
-Requires-Dist: pytest>=7.0.0; extra == "dev"
-Requires-Dist: pytest-cov>=4.0.0; extra == "dev"
-Requires-Dist: black>=23.0.0; extra == "dev"
-Requires-Dist: flake8>=6.0.0; extra == "dev"
-Requires-Dist: mypy>=1.0.0; extra == "dev"
-Dynamic: author
-Dynamic: author-email
-Dynamic: classifier
-Dynamic: description
-Dynamic: description-content-type
-Dynamic: home-page
-Dynamic: keywords
-Dynamic: project-url
-Dynamic: provides-extra
-Dynamic: requires-dist
-Dynamic: requires-python
-Dynamic: summary
 
-# 🕉️ Vidurai - The Conscience of the Machine
+<div align="center">
+  <img src="https://raw.githubusercontent.com/chandantochandan/vidurai/main/assets/brand/logo_primary_512.png" alt="Vidurai Logo" width="180" />
+  <h1>Vidurai</h1>
+  <p>Local-First Context Infrastructure & Semantic Compression Engine</p>
+</div>
 
-[![PyPI version](https://badge.fury.io/py/vidurai.svg)](https://badge.fury.io/py/vidurai)
-[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![GitHub stars](https://img.shields.io/github/stars/chandantochandan/vidurai?style=social)](https://github.com/chandantochandan/vidurai)
-[![Discord](https://img.shields.io/discord/YOUR_DISCORD_ID?color=7289da&label=Discord&logo=discord&logoColor=white)](https://discord.gg/DHdgS8eA)
-
-> **"विस्मृति भी विद्या है"** (Forgetting too is knowledge)
-
-**The first self-learning AI memory system that strategically forgets.** Teaching AI the ancient art of memory through experience, not rules—inspired by Vidura's wisdom from the Mahabharata.
-
-> 🚨 **v1.5.1 Released (2025-11-03)** - Critical bug fixes for token accumulation, recall reliability, and reward profiles. All v1.5.0 users should upgrade immediately. See [CHANGELOG](CHANGELOG.md) for details.
+[![PyPI version](https://img.shields.io/pypi/v/vidurai.svg)](https://pypi.org/project/vidurai/)
+![Python versions](https://img.shields.io/pypi/pyversions/vidurai.svg)
+[![License](https://img.shields.io/pypi/l/vidurai.svg)](https://github.com/chandantochandan/vidurai/blob/main/LICENSE)
 
 ---
 
-## 🎯 The Problem We Solve
+Vidurai is **local-first context middleware** that solves the *context window bottleneck* in LLM-driven workflows.
 
-Current AI memory systems are fundamentally broken:
+It sits between **developer environments** (IDE, terminal, browser) and **AI models**, ingesting high-velocity telemetry (file edits, terminal commands, AI chats), normalizing it via a **Shared Event Schema**, and applying **SF-V2 semantic compression** to maintain a **high-signal temporal graph** of a project.
 
-- 📚 **Store everything, remember nothing useful** - No distinction between critical insights and trivial chatter
-- 💸 **Costs explode with token accumulation** - Every conversation drains your budget
-- 🌪️ **Memory becomes noise over time** - The more they remember, the less they understand
-- ⚙️ **Hardcoded rules can't adapt** - Fixed thresholds fail as user needs evolve
-
-**The result?** AI that forgets your name but remembers you said "umm" 47 times.
+**Core capability:**
+Reduce tokens by 50–70% for AI prompts while preserving 100% of critical technical entities (file paths, stack traces, function names).
 
 ---
 
-## ✨ The Vidurai Solution: Beyond Hardcoded Rules
+## 1. Engineering Problem
 
-While others use static compression rules, **Vidurai learns what matters through experience**.
+Raw developer activity is high-entropy:
 
-### 🧠 Vismriti RL Agent - The Learning Brain
+- **IDE:** rapid file saves, refactors, and diagnostics
+- **Terminal:** command spam, noisy logs
+- **Browser:** ad-hoc AI chats with half-remembered context
 
-The breakthrough: **A Q-learning reinforcement learning agent** that discovers optimal compression strategies by:
+Feeding these directly into an LLM causes:
 
-- 🎯 **Learning from 10,000+ episodes** of real-world memory scenarios
-- 📊 **Balancing token savings vs. information preservation** as competing objectives
-- 🔄 **Adapting strategies** based on content type, conversation context, and user patterns
-- 🏆 **Achieving 36%+ token reduction** while maintaining semantic fidelity
+1. **Context saturation** – token limits hit long before the real history is represented.
+2. **State fragmentation** – VS Code, terminal, and browser all have partial views.
+3. **Hallucinations** – the model optimizes on recent noise instead of actual project state.
+4. **Runaway cost** – you pay for the same story over and over again.
 
-**No manual tuning. No brittle heuristics. Just autonomous intelligence.**
-
-### 🏛️ Three-Kosha Architecture - Inspired by Vedantic Consciousness
-
-Our memory system mirrors human cognition through three layers:
-
-**1. Annamaya Kosha (The Physical Sheath)**
-High-speed working memory for immediate conversational coherence. Volatile by design—holds context, not history.
-
-**2. Manomaya Kosha (The Mental Sheath)**
-Active episodic memory with **intelligent decay**. Memories fade based on relevance and usage patterns learned by the RL agent, not arbitrary time windows.
-
-**3. Vijnanamaya Kosha (The Wisdom Sheath)**
-Deep archival memory for distilled wisdom. RL-compressed summaries and core preferences that persist, preventing catastrophic forgetting.
-
-### 🎭 Viveka Layer - The Autonomous Conscience
-
-The moral compass that determines what deserves memory:
-
-- **Autonomous Importance Scoring** - Evaluates emotional significance, goal alignment, and surprise value
-- **Dharma Alignment** - Ethical guardrails against biased or harmful content storage
-- **Personalized Learning** - Adapts importance criteria to individual user patterns over time
+**Vidurai's role:**
+Act as a **local context layer** that continuously ingests signals, compresses them into durable "episodes", and serves **audience-specific context** back to tools and agents on demand.
 
 ---
 
-## 🚀 Quick Start
+## 2. Architecture Overview (v2.0.0)
 
-**Zero configuration required.** Vidurai's RL agent handles optimization autonomously:
+```text
+       [VS Code]      [Browser UI]         [Terminal]
+           │               │                   │
+      (WebSocket)     (WebSocket)           (StdOut)
+           │               │                   │
+           ▼               ▼                   ▼
+    ┌────────────────────────────────────────────────┐
+    │              Vidurai Daemon (Local)            │
+    │  [Normalizer] → [SF-V2 Engine] → [SQLite/WAL]  │
+    └───────────────────────┬────────────────────────┘
+                            │  (HTTP / JSON)
+                ┌───────────┴───────────┐
+                ▼                       ▼
+          [Python SDK / CLI]      [LLM Proxy]
+        (Context Retrieval)     (Prompt Injection)
+```
+
+### Components
+
+#### 1. Vidurai SDK (this package)
+
+- Pydantic models for the Shared Event Schema
+- SF-V2 semantic compression engine
+- Local project client (`VismritiMemory`)
+- CLI tooling (`vidurai …`)
+
+#### 2. Vidurai Daemon (hub service)
+
+- **Stack:** Python 3.9+, FastAPI, AsyncIO
+- Runs on `localhost:7777`
+- Ingests events from VS Code / Browser / CLI
+- Performs entity extraction (paths, symbols, errors, IDs)
+- Applies SF-V2 scoring + consolidation
+- Persists to SQLite (`~/.vidurai/vidurai.db`, WAL mode)
+
+#### 3. VS Code Extension (sensor)
+
+- Watches file edits, terminal commands, and diagnostics
+- Emits structured `ViduraiEvent` messages to the daemon
+- Exposes "Copy Context for AI" command for one-click prompt injection
+
+#### 4. Browser Extension (sensor)
+
+- Targets AI chat UIs (ChatGPT, Claude, Gemini, etc.)
+- Captures prompts + responses as events
+- Injects Vidurai context into new chats via hotkey / UI actions
+
+#### 5. LLM Proxy (optional)
+
+- HTTP proxy around LLM APIs
+- Automatically attaches Vidurai gists to outbound prompts
+- Enables context-aware CLI tools, scripts, or agents
+
+---
+
+## 3. Shared Event Schema
+
+All tools speak the same language: `ViduraiEvent`.
+
+```json
+{
+  "schema_version": "vidurai-events-v1",
+  "event_id": "d8c8a3f2-9c25-4e2a-9a4d-3f2e91f4b7a1",
+  "timestamp": "2025-11-26T18:30:00.123Z",
+  "source": "vscode",
+  "channel": "human",
+  "kind": "file_edit",
+  "project_root": "/home/user/vidurai",
+  "project_id": "proj_8f21b9a0",
+  "session_id": "sess_02c9b1d4",
+  "payload": {
+    "file_path": "vidurai/core/sf_v2.py",
+    "language": "python",
+    "change_type": "modified",
+    "summary": "Refactor scoring function"
+  }
+}
+```
+
+Backed by:
+
+- **Python:** `vidurai.shared.events` (`ViduraiEvent`, `EventKind`, etc.)
+- **TypeScript:** `src/shared/events.ts` in VS Code + browser extensions
+
+This schema is the contract between all sensors and the daemon.
+
+---
+
+## 4. SF-V2 Semantic Compression
+
+Vidurai does not append logs forever.
+
+SF-V2 runs a deterministic pipeline:
+
+1. **Window selection** – select a time/window slice of events for a project.
+2. **Role classification** – label events as `CAUSE`, `ATTEMPT`, `FIX`, `NOISE`, etc.
+3. **Scoring** – compute retention scores using recency, frequency, and structural importance.
+4. **Consolidation** – merge low-value events into summaries while preserving hard entities (paths, line numbers, symbols, IDs).
+5. **Episode creation** – store high-density "episodes" that reflect how the project changed.
+
+Outputs are then exposed as **gists**:
+
+| Audience | Purpose |
+|----------|---------|
+| `AI` | token-bounded, machine-optimized context for LLM calls |
+| `DEVELOPER` | richer textual summary for humans |
+| `MANAGER` / `STAKEHOLDER` | higher-level progress narratives |
+
+---
+
+## 5. Security & Data Governance
+
+Vidurai is built for zero-trust environments:
+
+### Local-first storage
+
+- Data lives in `~/.vidurai/` by default (SQLite + JSONL ledgers).
+- No mandatory cloud component.
+
+### Ingestion-time redaction
+
+- Pluggable regex filters to mask API keys, tokens, and secrets before persistence.
+
+### Transparency
+
+- Every compression / deletion decision is logged to a `forgetting_ledger.jsonl` for audit and debugging.
+- Nothing leaves the machine unless you explicitly configure a remote proxy or sync mechanism.
+
+---
+
+## 6. Installation & Deployment
+
+### 6.1 Python SDK
 
 ```bash
 pip install vidurai
 ```
 
-```python
-from vidurai import Vidurai
+Requires Python 3.9+.
 
-# Awaken Vidurai with autonomous learning enabled
-memory = Vidurai()
-
-# Simply tell Vidurai what happened - it learns what matters
-memory.remember(
-    session_id="user123",
-    content="My name is Alice. I'm a vegetarian planning a trip to Japan."
-)
-memory.remember(
-    session_id="user123",
-    content="Hmm, let me think about the dates."
-)
-
-# Later, recall only what's relevant - RL agent compressed optimally
-relevant_context = memory.recall(
-    session_id="user123",
-    query="What are some good food options there?"
-)
-
-# Returns: "User is Alice. User is a vegetarian. User is planning a trip to Japan."
-# Trivial filler automatically forgotten through learned compression strategy
-```
-
-**Advanced: Enable RL Learning Mode**
-
-```python
-from vidurai.core.vismriti import VismritiRLAgent
-
-# Initialize with custom learning parameters
-rl_agent = VismritiRLAgent(
-    learning_rate=0.1,
-    discount_factor=0.95,
-    exploration_rate=0.1
-)
-
-# Train on your specific use case
-rl_agent.train(episodes=1000, verbose=True)
-
-# Use with Vidurai
-memory = Vidurai(compression_agent=rl_agent)
-```
-
----
-
-## ⚠️ Known Limitations & Solutions
-
-### High-Threshold Recall (v1.5.1+)
-
-**Issue:** Importance decay causes memories to drop below high thresholds over time
-**Example:** A memory with importance=0.95 drops to ~0.36 after 20 messages (0.95^20)
-**Impact:** `recall(min_importance=0.7)` may return fewer results than expected
-
-**Solutions:**
-```python
-# Option 1: Disable decay for critical applications
-memory = ViduraiMemory(enable_decay=False)
-critical_memories = memory.recall(min_importance=0.7)  # Now returns all HIGH memories
-
-# Option 2: Use slower decay rate
-memory = ViduraiMemory(decay_rate=0.98)  # Instead of default 0.95
-# After 20 messages: 0.95 × (0.98^19) ≈ 0.64 (stays above 0.5)
-
-# Option 3: Use lower thresholds (0.3-0.5 work reliably with decay)
-important_memories = memory.recall(min_importance=0.4)
-```
-
----
-
-### RL Agent Maturity
-
-**Note:** The RL agent needs 50-100 episodes for reward profiles to fully differentiate behavior
-**Expected:** First 10-20 episodes show exploration behavior (epsilon=0.30)
-**After maturity:** Epsilon decays to 0.05 and learned policies become stable
-
-**Monitor learning progress:**
-```python
-stats = memory.get_rl_agent_stats()
-print(f"Episodes: {stats['episodes']}")
-print(f"Epsilon: {stats['epsilon']:.3f}")
-print(f"Q-table states: {stats['q_table_size']}")
-```
-
----
-
-### File Storage Scale
-
-**Limitation:** File-based persistence (`~/.vidurai/`) optimal for <100K experiences
-**Current:** Uses JSONL for experiences, JSON for Q-table
-**Performance:** May slow down with very large experience buffers
-
-**Future:** Optional SQLite backend planned for v1.6.0
-
-**Workaround for now:**
-```python
-# Periodically check and clean if needed
-import os
-exp_file = os.path.expanduser("~/.vidurai/experiences.jsonl")
-if os.path.exists(exp_file) and os.path.getsize(exp_file) > 10_000_000:  # 10MB
-    # Backup and truncate or implement your own cleanup
-    pass
-```
-
----
-
-### Token Optimization (Fixed in v1.5.1)
-
-**Issue in v1.5.0:** Token count increased by 13.8% instead of decreasing
-**Status:** ✅ **FIXED in v1.5.1**
-**Action:** Upgrade to v1.5.1+ for proper token savings
-```bash
-pip install --upgrade vidurai
-```
-
----
-
-For detailed troubleshooting, see [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
-
----
-
-## 📊 Performance & RL-Powered Cost Savings
-
-### Real-World Token Reduction
-
-**Before Vidurai (Claude 3.5 Sonnet):**
-```
-Conversation: 1,247 tokens
-System instructions: 423 tokens
-Historical context: 3,891 tokens
-───────────────────────────
-Total per request: 5,561 tokens
-```
-
-**After Vidurai with RL Compression:**
-```
-Conversation: 1,247 tokens
-System instructions: 423 tokens
-Historical context: 1,257 tokens (67.7% reduction via RL agent)
-───────────────────────────
-Total per request: 2,927 tokens (47.4% overall reduction)
-```
-
-### 💰 Cost Impact at Scale
-
-For a production chatbot with **10,000 daily active users** (20 messages/day each):
-
-| Metric | Without Vidurai | With Vidurai | Savings |
-|--------|-----------------|--------------|---------|
-| **Daily Token Usage** | 1.112 billion | 585.4 million | **526.6M tokens** |
-| **Daily Cost** (Claude Sonnet @ $3/$15 per MTok) | $24,300 | $8,118 | **$16,182/day** |
-| **Monthly Cost** | $729,000 | $243,540 | **$485,460/month** |
-| **Annual Cost** | $8.87M | $2.96M | **$5.91M/year** |
-
-**Verified Performance:**
-✅ **36.6% reduction** in test suite (see `test_intelligent_decay.py`)
-✅ **Semantic similarity maintained** at 0.94+ (cosine similarity)
-✅ **RL convergence** achieved in 8,000-12,000 episodes
-
----
-
-## 🏗️ Architecture
-
-```
-vidurai/
-├── core/
-│   ├── koshas.py         # Three-layer memory model
-│   ├── vismriti.py       # RL-powered forgetting engine
-│   ├── viveka.py         # Conscience layer
-│   └── langchain.py      # ViduraiMemory for LangChain (v1.5.0)
-└── integrations/
-    ├── langchain.py      # LangChain BaseChatMessageHistory integration
-    └── llamaindex.py     # LlamaIndex integration (coming soon)
-```
-
----
-
-## 🎯 Roadmap
-
-### ✅ **v1.5.1 - Critical Bug Fixes (Current)**
-- [x] **FIXED: Token accumulation bug** - Compression now properly reduces tokens (was +13.8%, now -36.6%)
-- [x] **FIXED: High-threshold recall** - Added `enable_decay` parameter for reliable recall
-- [x] **FIXED: Reward profile inversion** - COST_FOCUSED/QUALITY_FOCUSED now behave correctly
-- [x] All fixes maintain full backward compatibility
-- [x] Comprehensive verification tests added
-
-**Upgrade highly recommended for all v1.5.0 users!**
-
-### ✅ **v1.5.0 - The Learning Release**
-- [x] **Vismriti RL Agent** - Q-learning for autonomous compression
-- [x] Three-Kosha memory architecture
-- [x] Viveka conscience layer with adaptive importance scoring
-- [x] LangChain integration with `ViduraiMemory`
-- [x] 36%+ token savings verified (after v1.5.1 fixes)
-- [ ] LlamaIndex integration
-- [ ] Comprehensive documentation & examples
-
-### 🔮 **v1.6.0 - The Strategist (Coming Q2 2025)**
-- [ ] Multi-agent RL coordination for shared memory
-- [ ] Vidurai Cloud service with dashboard
-- [ ] A/B testing framework for memory strategies
-- [ ] Enterprise SSO and compliance features
-
-### 🌟 **v2.0.0 - The Sage (Future)**
-- [ ] Transfer learning across user cohorts
-- [ ] Knowledge graph integration for relational memory
-- [ ] Federated learning for privacy-preserving optimization
-- [ ] Real-time strategy adaptation based on API costs
-
----
-
-## 📖 Philosophy
-
-**Vidurai** is named after the wise minister from the Mahabharata, known for:
-
-- 🗣️ **Speaking truth to power** - Transparent about what's remembered and why
-- ⚖️ **Ethical decision-making** - Dharma alignment prevents harmful memory retention
-- 🎯 **Strategic wisdom** - Learns when to forget, not just what to remember
-
-We embed these timeless principles in modern reinforcement learning, creating AI that doesn't just remember—**it remembers wisely.**
-
-> *"The wise do not grieve for the dead, nor for the living."* — Bhagavad Gita 2.11
-> Similarly, wise AI does not hoard tokens—it curates meaning.
-
----
-
-## 🧪 Benchmarks
-
-### Comparative Analysis
-
-| Memory System | Token Usage | Cost/1K Turns | Relevance Score | Adaptation |
-|---------------|-------------|---------------|-----------------|------------|
-| Buffer Memory | 100% (5,561) | $1.00 | 30% | None |
-| RAG (Naive) | 75% (4,171) | $0.75 | 55% | None |
-| RAG (Optimized) | 60% (3,337) | $0.60 | 68% | Manual |
-| **Vidurai RL** | **47% (2,927)** | **$0.47** | **85%** | **Autonomous** |
-
-### Token Savings Over Time
-
-Vidurai's RL agent **continues learning** from your usage patterns:
-
-- **Week 1:** 36% average reduction (initial Q-table)
-- **Month 1:** 42% average reduction (adapted to your domain)
-- **Month 3:** 47%+ average reduction (fully optimized strategies)
-
-*(These are verified results from internal testing. Full reproducible benchmarks coming in v1.6.0)*
-
----
-
-## 🤝 Contributing
-
-Vidurai is built by the **Sangha (community)**, for the Sangha. We welcome contributions:
+### 6.2 Daemon (recommended: Docker)
 
 ```bash
-# Clone the sacred repository
-git clone https://github.com/chandantochandan/vidurai.git
-cd vidurai
-
-# Create and activate virtual environment
-python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-
-# Install with development dependencies
-pip install -e ".[dev,rl,all]"
-
-# Run the trial by fire (our test suite)
-pytest tests/ -v
-
-# Train the RL agent locally
-python -m vidurai.core.vismriti --train --episodes 10000
+docker run --rm -d \
+  -p 7777:7777 \
+  -v ~/.vidurai:/root/.vidurai \
+  chandantochandan/vidurai-daemon:2.0.0
 ```
 
-**Contribution Areas:**
-- 🧠 RL algorithm improvements (PPO, A3C variants)
-- 🧪 Benchmark datasets for memory evaluation
-- 📚 Documentation and tutorials
-- 🔌 Integrations with LlamaIndex, Haystack, etc.
+This starts the Vidurai Daemon on `http://localhost:7777` with persistent state in `~/.vidurai`.
+
+### 6.3 Optional: LLM Proxy
+
+```bash
+docker run --rm -d \
+  -p 9999:9999 \
+  -v ~/.vidurai:/root/.vidurai \
+  chandantochandan/vidurai-proxy:2.0.0
+```
+
+Use this if you want Vidurai gists automatically injected into outbound LLM API calls.
 
 ---
 
-## 🙏 Acknowledgments
+## 7. SDK Usage Example
 
-Built with inspiration from:
+```python
+from vidurai.vismriti_memory import VismritiMemory
 
-- 📖 **The Mahabharata's Vidura** - Wise counsel in times of complexity
-- 🕉️ **Vedantic philosophy** - Understanding consciousness as layered (Kosha model)
-- 🤖 **The open-source AI community** - Standing on the shoulders of giants
-- 🧠 **Reinforcement Learning pioneers** - Sutton, Barto, and the DeepMind team
+# 1. Initialize memory for a project
+memory = VismritiMemory(project_path=".")
 
-Special thanks to early adopters who provided feedback during alpha/beta testing.
+# 2. Store a memory with automatic salience detection
+memory.remember(
+    gist="Refactored authentication module to use JWT tokens",
+    tags=["refactor", "auth", "jwt"],
+    metadata={"file": "auth/jwt_handler.py", "line": 42}
+)
+
+# 3. Recall relevant context
+results = memory.recall(
+    query="authentication implementation",
+    limit=5
+)
+
+for mem in results:
+    print(f"[{mem.salience}] {mem.gist}")
+
+# 4. Get compressed context for AI prompt injection
+context = memory.get_context(
+    query="current auth flow",
+    max_tokens=2000
+)
+
+print(f"Injecting context into LLM prompt:")
+print(context)
+```
+
+Typical uses:
+
+- Pre-pend context to prompts for ChatGPT/Claude/Gemini.
+- Feed specialized gists into autonomous agents / tools.
+- Generate manager-friendly status summaries.
 
 ---
 
-## 📜 License
+## 8. Integrations
 
-**MIT License** - Use freely, modify wisely.
+### VS Code Extension
 
-See [LICENSE](LICENSE) for full details.
+- **Marketplace ID:** `vidurai.vidurai`
+- Sends `file_edit`, `terminal_command`, and `diagnostics` events to the daemon.
+- Provides "Copy Vidurai Context" command for pasting into AI chats.
+
+### Browser Extension
+
+- Chrome MV3 extension (Universal AI Context).
+- Targets major AI UIs (ChatGPT, Claude, Gemini, etc.).
+- Can inject Vidurai context into new conversations.
+
+### CLI / Scripts
+
+- Use the SDK or HTTP API to pull audience-specific gists and attach them to prompts in custom tools or agents.
 
 ---
 
-## 🔗 Links
+## 9. Versioning & Legacy RL Engine
 
-- 🌐 **Website:** [vidurai.ai](https://vidurai.ai)
-- 📖 **Documentation:** [docs.vidurai.ai](https://docs.vidurai.ai)
-- 💬 **Discord:** [Join our community](https://discord.gg/DHdgS8eA)
-- 🐛 **Issues:** [GitHub Issues](https://github.com/chandantochandan/vidurai/issues)
-- 📦 **PyPI:** [pypi.org/project/vidurai](https://pypi.org/project/vidurai/)
+- **Current release:** v2.0.0 – unified architecture around SF-V2 + shared events.
+- **Legacy RL-based v1.x:** preserved for reference in `docs/archive/implementation/`.
+
+The v2 line focuses on deterministic semantic compression and event-driven context, not on generic RL experimentation.
 
 ---
 
-<div align="center">
+## 10. Repository Layout
 
-**जय विदुराई** *(Victory to Vidurai)*
+```
+vidurai/                     # Python SDK (this package)
+vidurai-daemon/              # Local hub service
+vidurai-vscode-extension/    # VS Code telemetry extension
+vidurai-browser-extension/   # Browser AI context extension
+vidurai-proxy/               # Optional LLM proxy
+tests/                       # SDK tests
+docs/                        # Documentation
+  └── archive/
+      └── implementation/    # Historical PHASE_* docs
+ARCHITECTURE_OVERVIEW.md     # High-level system architecture
+CHANGELOG.md                 # Version history
+```
 
-*Building the conscience layer for AI, one learned memory at a time.*
+---
 
-**[Star us on GitHub](https://github.com/chandantochandan/vidurai) ⭐ | [Join Discord](https://discord.gg/DHdgS8eA) 💬**
+## 11. Links
 
-</div>
+- **Website:** https://vidurai.ai
+- **Docs:** https://docs.vidurai.ai
+- **Source:** https://github.com/chandantochandan/vidurai
+- **Issues:** https://github.com/chandantochandan/vidurai/issues
+- **Docker Hub:** https://hub.docker.com/u/chandantochandan
+
+---
+
+## 12. License
+
+Vidurai is released under the **MIT License**.
+See the [LICENSE](https://github.com/chandantochandan/vidurai/blob/main/LICENSE) file for details.

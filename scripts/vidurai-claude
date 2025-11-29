@@ -1,0 +1,93 @@
+#!/usr/bin/env bash
+# Vidurai-enhanced Claude Code wrapper
+# Usage: vidurai-claude "your question"
+# v2.0 - Database-backed context injection
+
+set -euo pipefail
+
+# Colors
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
+
+# Check if claude command exists
+if ! command -v claude &> /dev/null; then
+    echo -e "${RED}Error: 'claude' command not found.${NC}"
+    echo ""
+    echo "Please install Claude Code first:"
+    echo "  Visit: https://docs.claude.com/claude-code"
+    echo ""
+    exit 1
+fi
+
+# Check if vidurai Python package is available
+if ! python3 -c "import vidurai" &> /dev/null 2>&1; then
+    echo -e "${YELLOW}Warning: Vidurai SDK not found. Installing...${NC}"
+    pip install vidurai --quiet
+
+    if [ $? -ne 0 ]; then
+        echo -e "${RED}Failed to install Vidurai. Please install manually:${NC}"
+        echo "  pip install vidurai"
+        exit 1
+    fi
+    echo -e "${GREEN}✓ Vidurai installed successfully${NC}"
+fi
+
+# Get current project directory
+PROJECT_DIR=$(pwd)
+
+# Get user's question
+USER_QUESTION="$*"
+
+if [ -z "$USER_QUESTION" ]; then
+    echo "Usage: vidurai-claude \"your question\""
+    echo ""
+    echo "Example:"
+    echo "  vidurai-claude \"How does authentication work in this project?\""
+    echo "  vidurai-claude \"What are the recent bugs I fixed?\""
+    echo ""
+    exit 1
+fi
+
+# Show what we're doing
+echo -e "${BLUE}🧠 Vidurai: Retrieving project context...${NC}"
+
+# Get context from Vidurai (v2.0 - database backend)
+VIDURAI_CONTEXT=$(python3 -c "
+from vidurai import VismritiMemory
+import sys
+
+try:
+    memory = VismritiMemory(project_path='$PROJECT_DIR')
+    context = memory.get_context_for_ai(query='$USER_QUESTION')
+    print(context)
+except Exception as e:
+    print(f'[Vidurai Error: {e}]', file=sys.stderr)
+    print('[No project context available]')
+" 2>&1)
+
+# Check if we got context
+if echo "$VIDURAI_CONTEXT" | grep -q "No relevant project context"; then
+    echo -e "${BLUE}ℹ️  No project context found. Running Claude without Vidurai...${NC}"
+    echo ""
+    claude "$USER_QUESTION"
+    exit 0
+fi
+
+# Show context preview
+CONTEXT_LINES=$(echo "$VIDURAI_CONTEXT" | wc -l)
+echo -e "${GREEN}✓ Retrieved $CONTEXT_LINES lines of project context${NC}"
+echo ""
+
+# Combine context + question
+FULL_PROMPT="$VIDURAI_CONTEXT
+
+---
+
+USER QUESTION:
+$USER_QUESTION"
+
+# Call Claude with enhanced prompt
+claude "$FULL_PROMPT"

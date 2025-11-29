@@ -1,0 +1,567 @@
+{
+  "audit_timestamp": "2025-11-25T22:10:00Z",
+  "audit_version": "1.0.0",
+
+  "sdk_state": {
+    "name": "vidurai",
+    "version": "1.6.1",
+    "location": "/home/user/vidurai",
+    "status": "PRODUCTION_READY",
+    "python_requires": ">=3.8",
+    "total_lines_of_code": 12130,
+    "main_entry_points": [
+      "vidurai=vidurai.cli:cli",
+      "vidurai-mcp=vidurai.mcp_server:main"
+    ],
+    "core_modules": {
+      "vismriti_memory.py": {
+        "lines": 1077,
+        "purpose": "Main VismritiMemory class - unified memory interface",
+        "classes": ["VismritiMemory"]
+      },
+      "cli.py": {
+        "lines": 730,
+        "purpose": "CLI tool with recall, context, stats, hints, pinning commands",
+        "functions": ["cli", "recall", "context", "stats", "recent", "export", "server", "clear", "info", "hints", "pin", "unpin", "pins", "forgetting_log", "forgetting_stats"]
+      },
+      "mcp_server.py": {
+        "lines": 505,
+        "purpose": "MCP (Model Context Protocol) server implementation",
+        "classes": ["MCPRequestHandler"]
+      }
+    },
+    "core_submodules": {
+      "core/rl_agent_v2.py": {
+        "lines": 692,
+        "purpose": "Reinforcement learning agent with Q-learning for memory optimization"
+      },
+      "core/semantic_consolidation.py": {
+        "lines": 972,
+        "purpose": "Semantic consolidation job with SF-V2 smart compression"
+      },
+      "core/entity_extractor.py": {
+        "lines": 530,
+        "purpose": "SF-V2: Extract 15+ technical entity types with 100% preservation"
+      },
+      "core/memory_role_classifier.py": {
+        "lines": 320,
+        "purpose": "SF-V2: Classify memories by narrative role (RESOLUTION/CAUSE/etc)"
+      },
+      "core/retention_score.py": {
+        "lines": 400,
+        "purpose": "SF-V2: Multi-factor retention scoring engine (0-200 range)"
+      },
+      "core/memory_pinning.py": {
+        "lines": 400,
+        "purpose": "SF-V2: User-controlled memory pinning (50-pin limit)"
+      },
+      "core/forgetting_ledger.py": {
+        "lines": 450,
+        "purpose": "SF-V2: JSONL audit trail for all forgetting events"
+      },
+      "core/proactive_hints.py": {
+        "lines": 700,
+        "purpose": "Proactive hint generation engine"
+      },
+      "core/hint_delivery.py": {
+        "lines": 480,
+        "purpose": "Hint delivery and filtering system"
+      },
+      "core/episode_builder.py": {
+        "lines": 450,
+        "purpose": "Episode builder for grouping related memories"
+      },
+      "core/event_bus.py": {
+        "lines": 300,
+        "purpose": "Event bus for async event publishing/subscribing"
+      },
+      "core/auto_memory_policy.py": {
+        "lines": 400,
+        "purpose": "Automatic memory policy management"
+      },
+      "core/multi_audience_gist.py": {
+        "lines": 380,
+        "purpose": "Multi-audience gist generation"
+      },
+      "core/retention_policy.py": {
+        "lines": 520,
+        "purpose": "Retention policy management"
+      },
+      "core/koshas.py": {
+        "lines": 700,
+        "purpose": "Three-kosha memory architecture (legacy)"
+      },
+      "core/vismriti.py": {
+        "lines": 190,
+        "purpose": "Vismriti forgetting engine (legacy)"
+      },
+      "core/viveka.py": {
+        "lines": 180,
+        "purpose": "Viveka conscience layer (legacy)"
+      },
+      "storage/database.py": {
+        "lines": 780,
+        "purpose": "SQLite database layer for persistent memory storage"
+      }
+    },
+    "test_files": {
+      "total_test_files": 24,
+      "test_lines": 7642,
+      "key_tests": [
+        "test_vismriti_v1_6_0.py",
+        "test_memory_role_classifier.py",
+        "test_entity_extractor.py",
+        "test_auto_memory_policy.py",
+        "test_proactive_hints.py",
+        "test_episode_builder.py",
+        "test_event_bus.py"
+      ]
+    },
+    "distribution": {
+      "wheel": "vidurai-1.6.1-py3-none-any.whl",
+      "tarball": "vidurai-1.6.1.tar.gz",
+      "location": "/home/user/vidurai/dist/"
+    },
+    "storage_paths": {
+      "default_db": "~/.vidurai/vidurai.db",
+      "forgetting_ledger": "~/.vidurai/forgetting_ledger.jsonl",
+      "config": "~/.vidurai/"
+    },
+    "dependencies": {
+      "core": ["loguru>=0.7.0", "pandas>=1.3.0"],
+      "cli": ["click>=8.0.0", "tabulate>=0.9.0"],
+      "rl": ["sentence-transformers>=2.2.0"],
+      "llm_providers": ["openai>=1.0.0", "anthropic>=0.18.0"],
+      "integrations": ["langchain>=0.1.0", "llama-index>=0.9.0"]
+    }
+  },
+
+  "proxy_state": {
+    "name": "vidurai-proxy",
+    "version": "NOT_VERSIONED",
+    "location": "/home/user/vidurai/vidurai-proxy",
+    "status": "DEVELOPMENT",
+    "framework": "FastAPI + Uvicorn",
+    "structure": {
+      "src/main.py": "FastAPI application entry point",
+      "src/routes/proxy_routes.py": "Proxy routing logic for Claude/OpenAI",
+      "src/utils/session_manager.py": "Session management",
+      "src/utils/config_loader.py": "Configuration loading",
+      "src/utils/metrics_tracker.py": "Metrics tracking",
+      "src/utils/provider_detection.py": "LLM provider detection",
+      "src/utils/terminal_ui.py": "Terminal UI rendering",
+      "src/utils/logger.py": "Logging utilities"
+    },
+    "dependencies": [
+      "fastapi==0.121.0",
+      "uvicorn[standard]==0.31.1",
+      "vidurai==1.6.1",
+      "httpx==0.28.1",
+      "rich==14.2.0"
+    ],
+    "endpoints": {
+      "configured_in": "src/routes/proxy_routes.py",
+      "purpose": "Intercept and enhance LLM API calls with Vidurai context"
+    },
+    "test_files": [
+      "test_local_proxy.py",
+      "test_live_claude.py",
+      "test_render_proxy.py"
+    ],
+    "deployment": {
+      "render_yaml": true,
+      "vercel_ignore": true
+    }
+  },
+
+  "extension_state": {
+    "name": "vidurai-vscode-extension",
+    "display_name": "Vidurai Memory Manager",
+    "version": "0.1.1",
+    "location": "/home/user/vidurai/vidurai-vscode-extension",
+    "status": "BETA",
+    "publisher": "vidurai",
+    "vscode_engine": "^1.80.0",
+    "structure": {
+      "src/extension.ts": "Main extension entry point",
+      "src/pythonBridge.ts": "Python process communication",
+      "src/fileWatcher.ts": "File change monitoring",
+      "src/terminalWatcher.ts": "Terminal command tracking",
+      "src/diagnosticWatcher.ts": "Error/warning tracking",
+      "src/views/memoryTreeView.ts": "Memory tree view UI",
+      "src/statusBar.ts": "Status bar integration",
+      "src/installer.ts": "Python bridge installation",
+      "src/utils.ts": "Utility functions"
+    },
+    "python_bridge": {
+      "location": "python-bridge/",
+      "files": [
+        "bridge.py",
+        "event_processor.py",
+        "gist_extractor.py",
+        "vidurai_manager.py"
+      ],
+      "dependencies": "vidurai>=1.6.1, pandas, numpy, loguru"
+    },
+    "commands": [
+      "vidurai.copyContext",
+      "vidurai.restartBridge",
+      "vidurai.showLogs",
+      "vidurai.refreshMemories",
+      "vidurai.showMemoryDetails",
+      "vidurai.copyMemoryContext"
+    ],
+    "vsix_packages": [
+      "vidurai-0.1.1.vsix",
+      "vidurai-memory-0.1.0.vsix"
+    ]
+  },
+
+  "daemon_state": {
+    "name": "vidurai-daemon",
+    "display_name": "Vidurai Ghost Daemon",
+    "version": "2.5.0",
+    "location": "/home/user/vidurai/vidurai-daemon",
+    "status": "ACTIVE_DEVELOPMENT",
+    "framework": "FastAPI + WebSocket",
+    "structure": {
+      "daemon.py": "Main daemon entry point (FastAPI + WebSocket)",
+      "auto_detector.py": "Auto-detection of AI platforms",
+      "metrics_collector.py": "Metrics collection",
+      "mcp_bridge.py": "MCP protocol bridge",
+      "smart_file_watcher.py": "Intelligent file watching",
+      "project_brain/": {
+        "scanner.py": "Project scanning and indexing",
+        "context_builder.py": "Context building from project",
+        "error_watcher.py": "Error monitoring",
+        "memory_store.py": "In-memory storage"
+      },
+      "intelligence/": {
+        "context_mediator.py": "Context mediation between AI platforms",
+        "human_ai_whisperer.py": "Human-AI interaction optimization",
+        "memory_bridge.py": "Memory bridge to Vidurai SDK"
+      }
+    },
+    "websocket_endpoint": "ws://localhost:7777",
+    "http_endpoints": [
+      "/smart-context",
+      "/report-error",
+      "/watch/{project_path}",
+      "/unwatch/{project_path}",
+      "/metrics"
+    ],
+    "cors": "Enabled for browser extension"
+  },
+
+  "browser_extension_state": {
+    "name": "vidurai-browser-extension",
+    "display_name": "Vidurai - Universal AI Context",
+    "version": "0.5.1",
+    "location": "/home/user/vidurai/vidurai-browser-extension",
+    "status": "ACTIVE_DEVELOPMENT",
+    "manifest_version": 3,
+    "structure": {
+      "manifest.json": "Chrome extension manifest",
+      "content.js": "Content script for page injection (20KB)",
+      "background.js": "Service worker",
+      "popup/": {
+        "popup.html": "Extension popup UI",
+        "popup.js": "Popup logic"
+      },
+      "strategies/": {
+        "formatter.js": "Context formatting",
+        "react-injector.js": "React-based injection"
+      },
+      "injectors/": {
+        "universal-injector.js": "Universal injection for all platforms"
+      }
+    },
+    "supported_platforms": [
+      "https://chat.openai.com/*",
+      "https://chatgpt.com/*",
+      "https://claude.ai/*",
+      "https://gemini.google.com/*",
+      "https://www.perplexity.ai/*",
+      "https://phind.com/*",
+      "https://you.com/*"
+    ],
+    "daemon_connection": "http://localhost:7777"
+  },
+
+  "chatgpt_extension_state": {
+    "name": "vidurai-chatgpt-extension",
+    "display_name": "Vidurai for ChatGPT",
+    "version": "0.1.0",
+    "location": "/home/user/vidurai/vidurai-chatgpt-extension",
+    "status": "PROTOTYPE",
+    "manifest_version": 3,
+    "structure": {
+      "manifest.json": "Chrome extension manifest",
+      "content.js": "ChatGPT-specific content script",
+      "background.js": "Service worker",
+      "popup/": {
+        "popup.html": "Popup UI",
+        "popup.js": "Popup logic (assumed)"
+      }
+    },
+    "supported_platforms": [
+      "https://chat.openai.com/*",
+      "https://chatgpt.com/*"
+    ],
+    "note": "Specialized version of browser extension for ChatGPT only"
+  },
+
+  "website_state": {
+    "name": "vidurai-website",
+    "version": "0.0.1",
+    "location": "/home/user/vidurai-website",
+    "status": "DEPLOYED",
+    "framework": "Astro 5.15.2",
+    "structure": {
+      "src/pages/index.astro": "Main landing page (61KB)",
+      "public/": "Static assets",
+      "dist/": "Built output"
+    },
+    "build_command": "astro build"
+  },
+
+  "docs_state": {
+    "name": "vidurai-docs",
+    "version": "0.0.0",
+    "location": "/home/user/vidurai-docs",
+    "status": "DEPLOYED",
+    "framework": "Docusaurus 3.9.2",
+    "structure": {
+      "docs/": {
+        "intro.md": "Introduction",
+        "quickstart.md": "Quick start guide",
+        "installation.md": "Installation guide",
+        "api-reference.md": "API reference",
+        "best-practices.md": "Best practices",
+        "configuration.md": "Configuration guide",
+        "faq.md": "FAQ",
+        "architecture/": [
+          "three-kosha.md",
+          "vismriti-engine.md",
+          "viveka-layer.md",
+          "rl-agent.md"
+        ],
+        "guides/": [
+          "getting-started.md",
+          "compression-strategies.md",
+          "memory-management.md",
+          "troubleshooting.md"
+        ],
+        "integrations/": [
+          "langchain.md",
+          "llamaindex.md",
+          "custom-integration.md"
+        ]
+      },
+      "build/": "Built documentation"
+    },
+    "build_command": "docusaurus build"
+  },
+
+  "sdk_internal_docs": {
+    "location": "/home/user/vidurai/docs/",
+    "files": [
+      "CLI_REFERENCE.md (15KB)",
+      "MCP_SERVER.md (19KB)",
+      "TROUBLESHOOTING.md (12KB)"
+    ]
+  },
+
+  "critical_findings": [
+    {
+      "severity": "HIGH",
+      "component": "vidurai-proxy",
+      "issue": "No version number defined in package or requirements",
+      "recommendation": "Add version to a VERSION file or __version__ variable"
+    },
+    {
+      "severity": "MEDIUM",
+      "component": "vidurai-chatgpt-extension",
+      "issue": "Appears to be prototype/duplicate of browser extension",
+      "recommendation": "Consolidate into single universal browser extension or document separate purpose"
+    },
+    {
+      "severity": "MEDIUM",
+      "component": "vidurai-website",
+      "issue": "Version 0.0.1 - not aligned with SDK version 1.6.1",
+      "recommendation": "Align website version with major releases"
+    },
+    {
+      "severity": "LOW",
+      "component": "vidurai SDK",
+      "issue": "24 test files scattered in root directory instead of tests/",
+      "recommendation": "Move all test files to tests/ directory"
+    },
+    {
+      "severity": "LOW",
+      "component": "vidurai SDK",
+      "issue": "Many implementation documentation files in root (21 PHASE_*.md files)",
+      "recommendation": "Move to docs/implementation/ or archive"
+    },
+    {
+      "severity": "INFO",
+      "component": "vidurai-daemon",
+      "issue": "Version 2.5.0 but no release artifacts",
+      "recommendation": "Create proper release workflow"
+    }
+  ],
+
+  "missing_components": [
+    {
+      "component": "GitHub Actions Workflows",
+      "location": ".github/workflows/",
+      "status": "NOT_FOUND",
+      "note": "Only RELEASE_NOTES_v1.5.0.md exists in .github/"
+    },
+    {
+      "component": "Unified version management",
+      "status": "NOT_FOUND",
+      "note": "Each component has independent versioning"
+    },
+    {
+      "component": "Integration tests across components",
+      "status": "NOT_FOUND",
+      "note": "No tests verifying SDK + Extension + Daemon work together"
+    },
+    {
+      "component": "Docker/Containerization",
+      "status": "NOT_FOUND",
+      "note": "No Dockerfiles for any component"
+    },
+    {
+      "component": "API documentation (OpenAPI/Swagger)",
+      "status": "PARTIAL",
+      "note": "MCP_SERVER.md exists but no auto-generated API docs"
+    }
+  ],
+
+  "version_matrix": {
+    "vidurai_sdk": "1.6.1",
+    "vidurai_proxy": "UNVERSIONED",
+    "vidurai_vscode_extension": "0.1.1",
+    "vidurai_daemon": "2.5.0",
+    "vidurai_browser_extension": "0.5.1",
+    "vidurai_chatgpt_extension": "0.1.0",
+    "vidurai_website": "0.0.1",
+    "vidurai_docs": "0.0.0"
+  },
+
+  "recommended_next_steps": [
+    {
+      "priority": "P0",
+      "task": "Create unified version v2.0.0 across all components",
+      "details": "Align SDK, Extensions, Daemon, Docs to v2.0.0 with coordinated release"
+    },
+    {
+      "priority": "P0",
+      "task": "Add GitHub Actions CI/CD workflows",
+      "details": "Automated testing, building, and publishing for all components"
+    },
+    {
+      "priority": "P1",
+      "task": "Consolidate browser extensions",
+      "details": "Merge vidurai-chatgpt-extension into vidurai-browser-extension or document separation"
+    },
+    {
+      "priority": "P1",
+      "task": "Move test files to tests/ directory",
+      "details": "Clean up root directory by moving 24 test files to proper location"
+    },
+    {
+      "priority": "P1",
+      "task": "Add Dockerfiles for deployment",
+      "details": "Create Dockerfile for daemon, proxy, and development environment"
+    },
+    {
+      "priority": "P2",
+      "task": "Archive implementation documentation",
+      "details": "Move PHASE_*.md files to docs/archive/ or separate repo"
+    },
+    {
+      "priority": "P2",
+      "task": "Create integration test suite",
+      "details": "End-to-end tests verifying SDK + Extension + Daemon work together"
+    },
+    {
+      "priority": "P2",
+      "task": "Update documentation for v2.0.0",
+      "details": "Refresh docs.vidurai.ai with SF-V2 features, new CLI commands, MCP server"
+    },
+    {
+      "priority": "P3",
+      "task": "Publish browser extension to Chrome Web Store",
+      "details": "Package and submit vidurai-browser-extension v1.0.0"
+    },
+    {
+      "priority": "P3",
+      "task": "Publish VS Code extension to marketplace",
+      "details": "Finalize and publish vidurai-vscode-extension v1.0.0"
+    }
+  ],
+
+  "storage_locations": {
+    "user_data": "~/.vidurai/",
+    "database": "~/.vidurai/vidurai.db",
+    "forgetting_ledger": "~/.vidurai/forgetting_ledger.jsonl",
+    "daemon_logs": "/home/user/vidurai/vidurai-daemon/daemon.log"
+  },
+
+  "api_endpoints": {
+    "mcp_server": {
+      "default": "http://localhost:8765",
+      "protocol": "HTTP JSON-RPC"
+    },
+    "daemon": {
+      "http": "http://localhost:7777",
+      "websocket": "ws://localhost:7777",
+      "smart_context": "POST /smart-context",
+      "report_error": "POST /report-error"
+    },
+    "proxy": {
+      "configured_in": "vidurai-proxy/src/routes/proxy_routes.py"
+    }
+  },
+
+  "feature_completeness": {
+    "sf_v2_smart_forgetting": {
+      "status": "COMPLETE",
+      "components": [
+        "memory_role_classifier.py",
+        "entity_extractor.py",
+        "retention_score.py",
+        "memory_pinning.py",
+        "forgetting_ledger.py",
+        "semantic_consolidation.py (enhanced)"
+      ],
+      "tests": "46/46 passing"
+    },
+    "proactive_hints": {
+      "status": "COMPLETE",
+      "components": [
+        "proactive_hints.py",
+        "hint_delivery.py"
+      ]
+    },
+    "episode_builder": {
+      "status": "COMPLETE",
+      "components": ["episode_builder.py"]
+    },
+    "event_bus": {
+      "status": "COMPLETE",
+      "components": ["event_bus.py"]
+    },
+    "cli_tool": {
+      "status": "COMPLETE",
+      "commands": 15
+    },
+    "mcp_server": {
+      "status": "COMPLETE",
+      "protocol": "JSON-RPC over HTTP"
+    }
+  }
+}
