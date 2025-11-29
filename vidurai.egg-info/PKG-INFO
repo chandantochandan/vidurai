@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: vidurai
-Version: 2.0.0
+Version: 2.0.1
 Summary: Vidurai — Local-First Context Infrastructure & Semantic Compression Engine
 Author: Chandan Kumar
 License-Expression: MIT
@@ -25,6 +25,8 @@ Description-Content-Type: text/markdown
 Requires-Dist: pydantic>=2.0.0
 Requires-Dist: watchdog>=3.0.0
 Requires-Dist: loguru>=0.7.0
+Requires-Dist: pandas>=2.0.0
+Requires-Dist: click>=8.0.0
 
 <div align="center">
   <img src="https://raw.githubusercontent.com/chandantochandan/vidurai/main/assets/brand/logo_primary_512.png" alt="Vidurai Logo" width="180" />

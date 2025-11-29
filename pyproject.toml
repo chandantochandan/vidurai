@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "vidurai"
-version = "2.0.0"
+version = "2.0.1"
 description = "Vidurai — Local-First Context Infrastructure & Semantic Compression Engine"
 readme = "README.md"
 license = "MIT"
@@ -28,7 +28,9 @@ classifiers = [
 dependencies = [
   "pydantic>=2.0.0",
   "watchdog>=3.0.0",
-  "loguru>=0.7.0"
+  "loguru>=0.7.0",
+  "pandas>=2.0.0",
+  "click>=8.0.0"
 ]
 
 [project.urls]
