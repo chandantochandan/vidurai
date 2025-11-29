@@ -5,12 +5,15 @@ A Vedantic approach to AI memory management
 विस्मृति भी विद्या है (Forgetting too is knowledge)
 """
 
+# Version (single source of truth in version.py)
+from vidurai.version import __version__, __version_info__
+
 # Legacy API (v1.5.x)
 from vidurai.core.koshas import ViduraiMemory, Memory
 from vidurai.core.vismriti import VismritiEngine, ForgettingPolicy
 from vidurai.core.viveka import VivekaEngine
 
-# New API (v1.6.0 - Vismriti Architecture)
+# New API (v2.0.0 - Vismriti Architecture)
 from vidurai.vismriti_memory import VismritiMemory
 from vidurai.core.data_structures_v3 import (
     Memory as VismritiMemoryObject,
@@ -18,7 +21,6 @@ from vidurai.core.data_structures_v3 import (
     MemoryStatus
 )
 
-__version__ = "1.6.1"  # Patch: Added pandas dependency
 __author__ = "Vidurai Team"
 
 # Export main classes
@@ -31,7 +33,7 @@ __all__ = [
     "VivekaEngine",
     "create_memory_system",
 
-    # New v1.6.0 (Vismriti Architecture)
+    # New v2.0.0 (Vismriti Architecture)
     "VismritiMemory",
     "VismritiMemoryObject",
     "SalienceLevel",

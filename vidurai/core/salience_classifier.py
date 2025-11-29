@@ -59,6 +59,14 @@ class SalienceClassifier:
             "log:", "debug:", "trace:", "timestamp:", "system:"
         ]
 
+        # ERROR indicators (should NOT be CRITICAL by default)
+        self.error_keywords = [
+            "error:", "error in", "typeerror", "syntaxerror",
+            "cannot find name", "unexpected keyword", "expected",
+            "undefined", "null reference", "exception",
+            "failed", "failure", "crash"
+        ]
+
     def classify(self, memory: Memory) -> SalienceLevel:
         """
         Classify memory salience
@@ -80,6 +88,14 @@ class SalienceClassifier:
         verbatim_lower = memory.verbatim.lower() if memory.verbatim else ""
         gist_lower = memory.gist.lower() if memory.gist else ""
         combined = f"{verbatim_lower} {gist_lower}"
+
+        # Rule 0: ERROR DETECTION - Errors should NOT be CRITICAL by default
+        # This prevents TypeScript/Python errors from polluting CRITICAL tier
+        is_error = any(kw in combined for kw in self.error_keywords)
+        if is_error:
+            # Errors start at MEDIUM unless explicitly marked otherwise
+            # They will be further downgraded by aggregation if repeated
+            return SalienceLevel.MEDIUM
 
         # Rule 1: CRITICAL - Explicit user commands
         if any(kw in combined for kw in self.critical_keywords):

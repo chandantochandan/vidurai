@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+# Start Vidurai MCP server in background
+# v2.0 - Phase 2
+
+set -euo pipefail
+
+HOST="${VIDURAI_MCP_HOST:-localhost}"
+PORT="${VIDURAI_MCP_PORT:-8765}"
+VIDURAI_DIR="$HOME/.vidurai"
+LOG_FILE="$VIDURAI_DIR/mcp-server.log"
+PID_FILE="$VIDURAI_DIR/mcp-server.pid"
+
+# Colors
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
+
+echo "🧠 Starting Vidurai MCP Server..."
+echo "   Host: $HOST"
+echo "   Port: $PORT"
+
+# Create directory
+mkdir -p "$VIDURAI_DIR"
+
+# Check if already running
+if [ -f "$PID_FILE" ]; then
+    OLD_PID=$(cat "$PID_FILE")
+    if ps -p "$OLD_PID" > /dev/null 2>&1; then
+        echo -e "${YELLOW}⚠️  Server already running (PID: $OLD_PID)${NC}"
+        echo "   Use ./scripts/stop-mcp-server to stop it first"
+        exit 1
+    else
+        echo "   Cleaning up stale PID file..."
+        rm "$PID_FILE"
+    fi
+fi
+
+# Check if port is in use
+if lsof -Pi :$PORT -sTCP:LISTEN -t >/dev/null 2>&1 ; then
+    echo -e "${RED}❌ Port $PORT already in use${NC}"
+    exit 1
+fi
+
+# Check if vidurai Python package is available
+if ! python3 -c "import vidurai" &> /dev/null 2>&1; then
+    echo -e "${RED}❌ Vidurai Python package not found${NC}"
+    echo "   Install with: pip install vidurai"
+    exit 1
+fi
+
+# Start server in background
+echo "   Starting server..."
+nohup python3 -m vidurai.mcp_server --host "$HOST" --port "$PORT" \
+    > "$LOG_FILE" 2>&1 &
+
+PID=$!
+echo $PID > "$PID_FILE"
+
+# Wait a moment and verify it started
+sleep 1
+
+if ps -p $PID > /dev/null 2>&1; then
+    echo -e "${GREEN}✅ Server started successfully!${NC}"
+    echo "   PID: $PID"
+    echo "   Logs: $LOG_FILE"
+    echo "   Health: http://$HOST:$PORT/health"
+    echo ""
+    echo "   Test it:"
+    echo "   curl http://$HOST:$PORT/health"
+    echo ""
+    echo "   Stop it:"
+    echo "   ./scripts/stop-mcp-server"
+else
+    echo -e "${RED}❌ Server failed to start${NC}"
+    echo "   Check logs:"
+    tail -n 20 "$LOG_FILE"
+    rm "$PID_FILE"
+    exit 1
+fi

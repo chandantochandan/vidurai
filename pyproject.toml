@@ -1,3 +1,46 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vidurai"
+version = "2.0.0"
+description = "Vidurai — Local-First Context Infrastructure & Semantic Compression Engine"
+readme = "README.md"
+license = "MIT"
+authors = [
+  { name = "Chandan Kumar" }
+]
+requires-python = ">=3.9"
+classifiers = [
+  "Development Status :: 5 - Production/Stable",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Operating System :: OS Independent",
+  "Environment :: Console",
+  "Topic :: Software Development :: Libraries",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+  "pydantic>=2.0.0",
+  "watchdog>=3.0.0",
+  "loguru>=0.7.0"
+]
+
+[project.urls]
+Homepage = "https://vidurai.ai"
+Documentation = "https://docs.vidurai.ai"
+Source = "https://github.com/chandantochandan/vidurai"
+"Bug Tracker" = "https://github.com/chandantochandan/vidurai/issues"
+Changelog = "https://github.com/chandantochandan/vidurai/blob/main/CHANGELOG.md"
+
+[tool.setuptools.packages.find]
+include = ["vidurai", "vidurai.*"]
+
 [tool.black]
 line-length = 88
 target-version = ['py39']

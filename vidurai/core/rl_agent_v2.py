@@ -505,18 +505,38 @@ class VismritiRLAgent:
             storage_dir: Where to store experiences and Q-table
         """
         self.reward_profile = reward_profile
-        
+
+        # SF-V2: Warn if COST_FOCUSED mode
+        if reward_profile == RewardProfile.COST_FOCUSED:
+            print("\n⚠️  COST_FOCUSED Mode Warning")
+            print("   This profile prioritizes:")
+            print("     • Aggressive compression (may lose context)")
+            print("     • Minimal token usage (gists over verbatim)")
+            print("     • Fast forgetting (shorter retention windows)")
+            print("")
+            print("   Preserved:")
+            print("     ✓ Error messages, stack traces")
+            print("     ✓ Function names, file paths")
+            print("     ✓ Root causes and resolutions")
+            print("     ✓ Pinned memories")
+            print("")
+            print("   Lost:")
+            print("     ✗ Detailed context")
+            print("     ✗ Debugging history")
+            print("     ✗ Nuanced observations")
+            print("")
+
         # Core components
         self.policy = QLearningPolicy(storage_dir=storage_dir)
         self.experience_buffer = ExperienceBuffer(storage_dir=storage_dir)
-        
+
         # Current episode state
         self.current_state: Optional[MemoryState] = None
         self.current_action: Optional[Action] = None
-        
+
         # Statistics
         self.actions_taken = 0
-        
+
         print(f"✅ Vismriti RL Agent initialized")
         print(f"   Reward profile: {reward_profile.value}")
         print(f"   Episodes: {self.policy.episodes}")

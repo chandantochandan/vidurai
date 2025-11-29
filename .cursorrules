@@ -1,0 +1,37 @@
+# VIDURAI CURSOR RULES
+
+## BEHAVIOR
+
+- ALWAYS inspect the repo structure before creating new files (e.g., `ls`, `ls -R`, or tree).
+- ALWAYS check existing modules before adding new ones (prefer extending, not duplicating).
+- ALWAYS run `pytest` on affected tests after making changes.
+- NEVER leave `TODO` comments without a clear implementation plan or explanation.
+- NEVER modify multiple subsystems in one PR unless explicitly asked (keep changesets small).
+
+## PYTHON STYLE
+
+- Use `black`-compatible formatting.
+- Type hints are MANDATORY for all public methods in `vidurai/`.
+- Use `loguru` for logging (do not use `print` for production paths).
+- Prefer dataclasses/Pydantic models for structured data, not raw dicts.
+
+## SF-V2 SPECIFICS
+
+- When modifying memory logic, respect the SF-V2 design (dual-trace, salience, forgetting ledger).
+- Do NOT re-introduce "store everything forever" behavior. Compression and forgetting are first-class.
+- Pinned or high-salience memories must NOT be silently deleted.
+
+## TESTING
+
+- All tests live in `tests/`.
+- Example: run specific tests with
+  `pytest tests/test_vismriti_v1_6_0.py`
+  or
+  `pytest tests/test_daemon_*.py`
+- Always add or update tests when changing core behavior.
+
+## BRAND COMPLIANCE
+
+- BEFORE generating any UI (HTML/CSS/React/README with logos), read `BRAND.md`.
+- NEVER reference external/CDN logos. Use relative paths under `assets/brand/`.
+- STRICTLY use the hex color codes defined in `BRAND.md` for brand elements.
