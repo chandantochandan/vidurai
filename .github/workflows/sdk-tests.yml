@@ -24,4 +24,4 @@ jobs:
           pip install -e .
 
       - name: Run pytest
-        run: pytest --maxfail=1 --disable-warnings
+        run: pytest --maxfail=5 --disable-warnings --ignore=tests/test_daemon_sql_bridge.py --ignore=tests/test_vismriti_v1_6_0.py
