@@ -84,3 +84,6 @@ ignore = ["E501"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = "test_*.py"
+markers = [
+    "asyncio: mark test as async (requires pytest-asyncio)",
+]

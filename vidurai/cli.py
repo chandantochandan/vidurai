@@ -66,7 +66,7 @@ def _check_tabulate():
 def _check_event_bus():
     """Check if event bus is available (lazy)."""
     try:
-        from vidurai.shared.events import publish_event
+        from vidurai.core.event_bus import publish_event
         return True
     except ImportError:
         return False
@@ -484,7 +484,7 @@ def recall(project, query, limit, min_salience, audience):
         EVENT_BUS_AVAILABLE = _check_event_bus()
         if EVENT_BUS_AVAILABLE:
             try:
-                from vidurai.shared.events import publish_event
+                from vidurai.core.event_bus import publish_event
                 publish_event(
                     "cli.recall",
                     source="cli",
@@ -582,7 +582,7 @@ def context(project, query, max_tokens, audience, show_hints, max_hints):
         EVENT_BUS_AVAILABLE = _check_event_bus()
         if EVENT_BUS_AVAILABLE:
             try:
-                from vidurai.shared.events import publish_event
+                from vidurai.core.event_bus import publish_event
                 publish_event(
                     "cli.context",
                     source="cli",
@@ -888,7 +888,7 @@ def get_context_json(project, query, max_tokens, audience):
         EVENT_BUS_AVAILABLE = _check_event_bus()
         if EVENT_BUS_AVAILABLE:
             try:
-                from vidurai.shared.events import publish_event
+                from vidurai.core.event_bus import publish_event
                 publish_event(
                     "cli.get_context_json",
                     source="cli",

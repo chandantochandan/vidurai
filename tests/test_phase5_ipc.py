@@ -19,6 +19,7 @@ Usage:
 Requires:
     - Daemon running: python -m vidurai_daemon.daemon
     - OR: Start daemon in subprocess for isolated testing
+    - pytest-asyncio for running async tests via pytest
 """
 
 import os
@@ -32,8 +33,36 @@ import tempfile
 from pathlib import Path
 from datetime import datetime
 
+import pytest
+
 # Add parent directory for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
+
+# Skip all async tests if pytest-asyncio is not installed
+try:
+    import pytest_asyncio
+    PYTEST_ASYNCIO_AVAILABLE = True
+except ImportError:
+    PYTEST_ASYNCIO_AVAILABLE = False
+
+# Check if daemon socket exists
+def _daemon_available():
+    """Check if daemon socket is available"""
+    uid = getpass.getuser()
+    if sys.platform == 'win32':
+        return False  # Can't easily check Windows named pipes
+    else:
+        sock_path = os.path.join(tempfile.gettempdir(), f"vidurai-{uid}.sock")
+        return os.path.exists(sock_path)
+
+DAEMON_AVAILABLE = _daemon_available()
+
+# Combined skip condition
+SKIP_IPC_TESTS = not PYTEST_ASYNCIO_AVAILABLE or not DAEMON_AVAILABLE
+SKIP_REASON = (
+    "Skipped: requires pytest-asyncio and running daemon "
+    f"(pytest-asyncio={PYTEST_ASYNCIO_AVAILABLE}, daemon={DAEMON_AVAILABLE})"
+)
 
 # Test subject identifier for cleanup
 TEST_SUBJECT = f"TEST_IPC_PHASE5_{int(datetime.now().timestamp())}"
@@ -132,6 +161,8 @@ class IPCTestClient:
             return {"ok": False, "error": f"Invalid JSON: {e}"}
 
 
+@pytest.mark.skipif(SKIP_IPC_TESTS, reason=SKIP_REASON)
+@pytest.mark.asyncio
 async def test_ping_pong():
     """Test basic connectivity with ping/pong"""
     print("\n=== Test: Ping/Pong ===")
@@ -153,6 +184,8 @@ async def test_ping_pong():
         await client.disconnect()
 
 
+@pytest.mark.skipif(SKIP_IPC_TESTS, reason=SKIP_REASON)
+@pytest.mark.asyncio
 async def test_focus_event():
     """Test focus event handling (StateLinker)"""
     print("\n=== Test: Focus Event (StateLinker) ===")
@@ -190,6 +223,8 @@ async def test_focus_event():
         await client.disconnect()
 
 
+@pytest.mark.skipif(SKIP_IPC_TESTS, reason=SKIP_REASON)
+@pytest.mark.asyncio
 async def test_get_focus():
     """Test get_focus query (StateLinker)"""
     print("\n=== Test: Get Focus State ===")
@@ -221,6 +256,8 @@ async def test_get_focus():
         await client.disconnect()
 
 
+@pytest.mark.skipif(SKIP_IPC_TESTS, reason=SKIP_REASON)
+@pytest.mark.asyncio
 async def test_terminal_event():
     """Test terminal event handling (Reality Check)"""
     print("\n=== Test: Terminal Event (Reality Check) ===")
@@ -249,6 +286,8 @@ async def test_terminal_event():
         await client.disconnect()
 
 
+@pytest.mark.skipif(SKIP_IPC_TESTS, reason=SKIP_REASON)
+@pytest.mark.asyncio
 async def test_resolve_path():
     """Test resolve_path query (StateLinker)"""
     print("\n=== Test: Resolve Path ===")
@@ -280,6 +319,8 @@ async def test_resolve_path():
         await client.disconnect()
 
 
+@pytest.mark.skipif(SKIP_IPC_TESTS, reason=SKIP_REASON)
+@pytest.mark.asyncio
 async def test_file_edit_event():
     """Test file_edit event handling"""
     print("\n=== Test: File Edit Event ===")
@@ -308,6 +349,8 @@ async def test_file_edit_event():
         await client.disconnect()
 
 
+@pytest.mark.skipif(SKIP_IPC_TESTS, reason=SKIP_REASON)
+@pytest.mark.asyncio
 async def test_diagnostic_event():
     """Test diagnostic event handling (Zombie Killer)"""
     print("\n=== Test: Diagnostic Event ===")
