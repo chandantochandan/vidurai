@@ -7,6 +7,7 @@ Tests automatic conversion of episodes to memories
 import sys
 import tempfile
 import shutil
+import pytest
 from pathlib import Path
 from datetime import datetime, timedelta
 
