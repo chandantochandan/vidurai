@@ -1,0 +1,27 @@
+# Core Framework
+fastapi==0.121.0
+uvicorn[standard]==0.31.1
+python-multipart==0.0.20
+
+# Vidurai Memory Management
+vidurai==1.6.1
+
+# HTTP & API
+httpx==0.28.1
+
+# Configuration
+pyyaml==6.0.3
+pydantic==2.12.4
+python-dotenv==1.0.1
+
+# Logging & Utilities
+loguru==0.7.3
+rich==14.2.0
+
+# Performance & Storage
+cachetools==5.3.2
+aiosqlite==0.19.0
+
+# JSON & Security
+orjson==3.9.10
+python-jose[cryptography]==3.3.0

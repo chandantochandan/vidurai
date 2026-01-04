@@ -1,0 +1,252 @@
+{
+  "name": "vidurai",
+  "displayName": "Vidurai Memory Manager",
+  "description": "Telemetry agent for VS Code. Captures low-latency file and terminal events for the Vidurai Daemon.",
+  "version": "2.2.0",
+  "publisher": "vidurai",
+  "icon": "assets/brand/logo_icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/chandantochandan/vidurai-vscode-extension"
+  },
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "ai",
+    "memory",
+    "claude",
+    "chatgpt",
+    "copilot",
+    "context",
+    "token-optimization",
+    "productivity",
+    "vidurai"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "vidurai",
+          "title": "Vidurai Memory",
+          "icon": "assets/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "vidurai": [
+        {
+          "id": "vidurai.contextView",
+          "type": "webview",
+          "name": "Context Dashboard"
+        },
+        {
+          "id": "viduraiMemory",
+          "name": "Project Memory"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Vidurai",
+      "properties": {
+        "vidurai.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable/disable Vidurai context tracking"
+        },
+        "vidurai.debounceMs": {
+          "type": "number",
+          "default": 2000,
+          "description": "Debounce time for file edits (milliseconds)",
+          "minimum": 500,
+          "maximum": 10000
+        },
+        "vidurai.pythonPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to Python executable (auto-detected if empty)"
+        },
+        "vidurai.logLevel": {
+          "type": "string",
+          "enum": [
+            "debug",
+            "info",
+            "warn",
+            "error"
+          ],
+          "default": "info",
+          "description": "Logging level for debugging"
+        },
+        "vidurai.maxFileSize": {
+          "type": "number",
+          "default": 51200,
+          "description": "Maximum file size to track (bytes, 0 = unlimited)",
+          "minimum": 0
+        },
+        "vidurai.trackTerminal": {
+          "type": "boolean",
+          "default": true,
+          "description": "Track terminal commands and output"
+        },
+        "vidurai.trackDiagnostics": {
+          "type": "boolean",
+          "default": true,
+          "description": "Track errors and warnings"
+        },
+        "vidurai.ignoredPaths": {
+          "type": "array",
+          "default": [
+            "node_modules",
+            ".git",
+            "dist",
+            "build",
+            "out",
+            ".venv"
+          ],
+          "description": "Paths to ignore for context tracking"
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "vidurai.copyContext",
+        "title": "Vidurai: Copy Relevant Context",
+        "icon": "$(copy)"
+      },
+      {
+        "command": "vidurai.restartBridge",
+        "title": "Vidurai: Restart Python Bridge",
+        "icon": "$(debug-restart)"
+      },
+      {
+        "command": "vidurai.showLogs",
+        "title": "Vidurai: Show Logs",
+        "icon": "$(output)"
+      },
+      {
+        "command": "vidurai.refreshMemories",
+        "title": "Refresh Memories",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "vidurai.showMemoryDetails",
+        "title": "Show Memory Details"
+      },
+      {
+        "command": "vidurai.copyMemoryContext",
+        "title": "Copy to Clipboard",
+        "icon": "$(clippy)"
+      },
+      {
+        "command": "vidurai.getContext",
+        "title": "Vidurai: Show Project Status",
+        "icon": "$(pulse)"
+      },
+      {
+        "command": "vidurai.getAIContext",
+        "title": "Vidurai: Copy AI Context (XML)",
+        "icon": "$(robot)"
+      },
+      {
+        "command": "vidurai.copyContextManager",
+        "title": "Vidurai: Copy Manager Summary",
+        "icon": "$(graph)"
+      },
+      {
+        "command": "vidurai.refreshContextPanel",
+        "title": "Vidurai: Refresh Context Dashboard",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "vidurai.pinFile",
+        "title": "Vidurai: Pin to Context",
+        "icon": "$(pin)"
+      },
+      {
+        "command": "vidurai.unpinFile",
+        "title": "Vidurai: Unpin",
+        "icon": "$(pinned)"
+      },
+      {
+        "command": "vidurai.switchProfile",
+        "title": "Vidurai: Switch Memory Profile",
+        "icon": "$(brain)"
+      },
+      {
+        "command": "vidurai.generateStandup",
+        "title": "Vidurai: Generate Standup Report",
+        "icon": "$(checklist)"
+      },
+      {
+        "command": "vidurai.generateManagerReport",
+        "title": "Vidurai: Generate Manager Report",
+        "icon": "$(graph)"
+      },
+      {
+        "command": "vidurai.generateAIContext",
+        "title": "Vidurai: Generate AI Context XML",
+        "icon": "$(robot)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "vidurai.refreshMemories",
+          "when": "view == viduraiMemory",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "vidurai.copyMemoryContext",
+          "when": "view == viduraiMemory && viewItem == memory",
+          "group": "inline"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "vidurai.pinFile",
+          "when": "resourceScheme == file",
+          "group": "vidurai@1"
+        },
+        {
+          "command": "vidurai.unpinFile",
+          "when": "resourceScheme == file",
+          "group": "vidurai@1"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "vidurai.pinFile",
+          "when": "resourceScheme == file",
+          "group": "navigation"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile",
+    "test": "node ./out/test/runTest.js",
+    "lint": "eslint src --ext ts"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/node": "^18.0.0",
+    "@types/vscode": "^1.80.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "@vscode/test-electron": "^2.3.0",
+    "eslint": "^8.45.0",
+    "typescript": "^5.1.0"
+  }
+}

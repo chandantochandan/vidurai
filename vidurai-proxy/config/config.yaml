@@ -1,0 +1,176 @@
+# Vidurai Proxy Server Configuration
+# All settings are dynamic - change without code modification
+
+server:
+  # Server binding
+  host: "0.0.0.0"
+  port: 8080
+
+  # CORS settings
+  cors_enabled: true
+  allowed_origins:
+    - "http://localhost:*"
+    - "https://*.vercel.app"
+    - "*"  # Allow all in development (restrict in production)
+
+  # Request limits
+  max_request_size_mb: 10
+  timeout_seconds: 300
+
+vidurai:
+  # Memory management settings
+  enable_decay: false              # true = aggressive compression, false = preserve all
+  decay_rate: 0.95                 # Importance decay rate (0.0-1.0)
+  reward_profile: "QUALITY"        # Options: QUALITY, BALANCED, COST_FOCUSED
+
+  # Compression settings
+  compression_enabled: true
+  compression_threshold: 10        # Compress after N messages (set to 1 to always compress)
+  min_tokens_to_compress: 50       # Don't compress if total tokens below this
+
+  # Memory retrieval settings
+  min_importance: 0.3              # Filter memories below this score (0.0-1.0)
+  max_memories_returned: 20        # Maximum memories to include in context
+
+  # Kosha (layer) settings
+  max_working_memory: 10           # Annamaya Kosha capacity
+  max_episodic_memory: 1000        # Manomaya Kosha capacity
+  max_archival_memory: 10000       # Vijnanamaya Kosha capacity
+
+  # Compression model
+  compression_model: "gpt-4o-mini" # Model used for semantic compression
+
+ai_providers:
+  # Anthropic (Claude)
+  anthropic:
+    enabled: true
+    base_url: "https://api.anthropic.com"
+    api_version: "2023-06-01"
+    model_prefix: "claude-"
+    default_model: "claude-sonnet-4"
+
+    # Path patterns to intercept
+    paths:
+      - "/v1/messages"
+      - "/v1/complete"
+
+    # Header detection
+    headers:
+      api_key: "x-api-key"
+      version: "anthropic-version"
+
+  # OpenAI (ChatGPT, GPT-4)
+  openai:
+    enabled: true
+    base_url: "https://api.openai.com/v1"
+    model_prefix: "gpt-"
+    default_model: "gpt-4"
+
+    paths:
+      - "/v1/chat/completions"
+      - "/v1/completions"
+
+    headers:
+      api_key: "Authorization"  # Bearer token
+
+  # Google (Gemini)
+  google:
+    enabled: false  # Enable when ready to support
+    base_url: "https://generativelanguage.googleapis.com/v1"
+    model_prefix: "gemini-"
+    default_model: "gemini-pro"
+
+    paths:
+      - "/v1/models/{model}:generateContent"
+
+    headers:
+      api_key: "x-goog-api-key"
+
+logging:
+  # Log levels: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  level: "INFO"
+
+  # Terminal output (rich formatting)
+  terminal_output: true
+  terminal_format: "rich"          # Options: rich, simple, json
+  show_request_details: false      # Show full request/response in terminal
+
+  # File output
+  file_output: true
+  log_file: "logs/proxy.log"
+  max_log_size_mb: 100
+  backup_count: 5                  # Keep N old log files
+
+  # Audit logging (detailed request tracking)
+  audit_enabled: true
+  audit_file: "logs/audit.log"
+
+session:
+  # Session management
+  auto_create: true                # Auto-create sessions from API key hash
+  session_id_length: 16            # Length of generated session IDs
+  timeout_minutes: 60              # Session expires after inactivity
+  cleanup_interval_minutes: 10     # How often to clean expired sessions
+
+  # Memory persistence
+  # DISABLED: Vidurai v1.5.1 RL agent uses lambda functions that can't be pickled
+  # Sessions work perfectly in-memory and will be recreated on restart
+  # This is acceptable for MVP as most AI conversations are short-lived
+  # TODO: Re-enable when Vidurai library supports serialization or we use Redis
+  persist_memory: false            # Save Vidurai memory between restarts
+  memory_dir: ".vidurai_sessions"  # Directory to store session data
+  save_interval_seconds: 60        # Auto-save interval
+
+metrics:
+  # Token/cost tracking
+  track_savings: true
+  show_realtime: true              # Display savings in terminal
+
+  # Provider pricing (cost per million tokens)
+  pricing:
+    anthropic:
+      claude-sonnet-4:
+        input: 3.0                 # $3/M tokens
+        output: 15.0               # $15/M tokens
+      claude-opus-4:
+        input: 15.0
+        output: 75.0
+
+    openai:
+      gpt-4:
+        input: 30.0
+        output: 60.0
+      gpt-4o:
+        input: 5.0
+        output: 15.0
+      gpt-4o-mini:
+        input: 0.15
+        output: 0.6
+
+  # Metrics export
+  export_enabled: false
+  export_format: "json"            # Options: json, csv, prometheus
+  export_file: "logs/metrics.json"
+
+advanced:
+  # Performance tuning
+  async_compression: true          # Compress in background (non-blocking)
+  cache_compressed_contexts: true  # Cache compression results
+  cache_ttl_seconds: 300           # Cache expiration
+
+  # Request handling
+  stream_support: false            # Support streaming responses (future)
+  retry_on_failure: true
+  max_retries: 3
+  retry_delay_seconds: 1
+
+  # Security
+  require_https: false             # Enforce HTTPS (enable in production)
+  api_key_validation: false        # Validate API keys before forwarding
+  rate_limiting: false             # Enable rate limiting (future)
+
+# Health check endpoint
+health_check:
+  enabled: true
+  path: "/health"
+  include_stats: true              # Include server stats in health response

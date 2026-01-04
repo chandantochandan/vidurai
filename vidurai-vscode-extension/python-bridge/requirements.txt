@@ -1,0 +1,6 @@
+# Vidurai SDK (version range for compatibility)
+vidurai>=1.6.1,<2.0.0
+
+# Testing
+pytest>=7.4.0
+pytest-cov>=4.1.0

@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      width: 320px;
+      padding: 16px;
+      font-family: system-ui, -apple-system, sans-serif;
+      background: linear-gradient(135deg, #0a0a0a 0%, #1a0a2e 100%);
+      color: #e5e7eb;
+    }
+
+    h1 {
+      font-size: 18px;
+      margin-bottom: 12px;
+      background: linear-gradient(90deg, #10b981, #8b5cf6);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .status {
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 16px;
+      border: 1px solid;
+    }
+
+    .status.connected {
+      background: rgba(16, 185, 129, 0.1);
+      border-color: #10b981;
+    }
+
+    .status.disconnected {
+      background: rgba(239, 68, 68, 0.1);
+      border-color: #ef4444;
+    }
+
+    .status-indicator {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+
+    .dot.connected { background: #10b981; }
+    .dot.disconnected { background: #ef4444; }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .metric {
+      background: rgba(139, 92, 246, 0.1);
+      padding: 12px;
+      border-radius: 6px;
+      border: 1px solid #8b5cf6;
+    }
+
+    .metric-label {
+      font-size: 11px;
+      color: #9ca3af;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    .metric-value {
+      font-size: 20px;
+      font-weight: bold;
+      color: #8b5cf6;
+    }
+
+    .actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    button {
+      flex: 1;
+      padding: 10px;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .primary {
+      background: #8b5cf6;
+      color: white;
+    }
+
+    .primary:hover {
+      background: #7c3aed;
+    }
+
+    .secondary {
+      background: rgba(139, 92, 246, 0.1);
+      color: #8b5cf6;
+      border: 1px solid #8b5cf6;
+    }
+
+    .secondary:hover {
+      background: rgba(139, 92, 246, 0.2);
+    }
+
+    .footer {
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid #374151;
+      font-size: 11px;
+      color: #6b7280;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <h1>🧠 Vidurai</h1>
+
+  <div id="status" class="status">
+    <div class="status-indicator">
+      <div id="statusDot" class="dot"></div>
+      <span id="statusText">Checking...</span>
+    </div>
+  </div>
+
+  <div class="metrics">
+    <div class="metric">
+      <div class="metric-label">Projects</div>
+      <div class="metric-value" id="projects">-</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Files</div>
+      <div class="metric-value" id="files">-</div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="primary" id="openDashboard">Dashboard</button>
+    <button class="secondary" id="refreshStatus">Refresh</button>
+  </div>
+
+  <div class="footer">
+    विस्मृति भी विद्या है<br>
+    Vidurai v0.3.0
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

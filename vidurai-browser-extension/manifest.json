@@ -1,0 +1,51 @@
+{
+  "manifest_version": 3,
+  "name": "Vidurai - Universal AI Context",
+  "version": "2.1.0",
+  "description": "Inject project context into any AI chat interface. Works with ChatGPT, Claude.ai, Gemini, and more.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "permissions": [
+    "activeTab",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://chat.openai.com/*",
+    "https://chatgpt.com/*",
+    "https://claude.ai/*",
+    "https://gemini.google.com/*",
+    "https://www.perplexity.ai/*",
+    "https://phind.com/*",
+    "https://you.com/*",
+    "http://localhost:7777/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://chat.openai.com/*",
+        "https://chatgpt.com/*",
+        "https://claude.ai/*",
+        "https://gemini.google.com/*",
+        "https://www.perplexity.ai/*",
+        "https://phind.com/*",
+        "https://you.com/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_end"
+    }
+  ],
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  }
+}

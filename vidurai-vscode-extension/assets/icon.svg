@@ -1,0 +1,15 @@
+<svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+  <!-- Three Kosha circles - monochrome for Activity Bar -->
+
+  <!-- Top circle (Vijnanamaya Kosha - Wisdom) -->
+  <circle cx="12" cy="9" r="5" fill="none" stroke="currentColor" stroke-width="1.5"/>
+
+  <!-- Bottom-left circle (Pranamaya Kosha - Energy) -->
+  <circle cx="8.5" cy="14.5" r="5" fill="none" stroke="currentColor" stroke-width="1.5"/>
+
+  <!-- Bottom-right circle (Annamaya Kosha - Physical) -->
+  <circle cx="15.5" cy="14.5" r="5" fill="none" stroke="currentColor" stroke-width="1.5"/>
+
+  <!-- Center "V" -->
+  <text x="12" y="13.5" font-family="Arial, sans-serif" font-size="7" font-weight="bold" fill="currentColor" text-anchor="middle">V</text>
+</svg>

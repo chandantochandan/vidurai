@@ -1,0 +1,12 @@
+.venv/
+venv/
+__pycache__/
+*.pyc
+.env
+.env.local
+logs/
+.vidurai_sessions/
+tests/
+*.md
+.git/
+.gitignore
