@@ -25,3 +25,14 @@ data/
 .coverage
 .pytest_cache/
 htmlcov/
+
+# Vidurai Runtime Files
+*.jsonl
+*.parquet
+dist/
+# --- Vidurai Repo Hygiene ---
+website/.next/
+**/node_modules/
+*.egg-info/
+dist/
+build/

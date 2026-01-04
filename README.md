@@ -1,310 +1,215 @@
-<div align="center">
-  <img src="https://raw.githubusercontent.com/chandantochandan/vidurai/main/assets/brand/logo_primary_512.png" alt="Vidurai Logo" width="180" />
-  <h1>Vidurai</h1>
-  <p>Local-First Context Infrastructure & Semantic Compression Engine</p>
-</div>
+# Vidurai: Local-First AI Memory Layer
 
-[![PyPI version](https://img.shields.io/pypi/v/vidurai.svg)](https://pypi.org/project/vidurai/)
-![Python versions](https://img.shields.io/pypi/pyversions/vidurai.svg)
-[![License](https://img.shields.io/pypi/l/vidurai.svg)](https://github.com/chandantochandan/vidurai/blob/main/LICENSE)
+[![PyPI](https://img.shields.io/pypi/v/vidurai)](https://pypi.org/project/vidurai/)
+[![License](https://img.shields.io/pypi/l/vidurai)](https://opensource.org/licenses/MIT)
+[![Python](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 
----
+**Vidurai** (v2.2.0) is a local background service that indexes your development context. It bridges your local codebase with AI tools (like Claude, Cursor, and VS Code) without uploading your source code to third-party vector clouds.
 
-Vidurai is **local-first context middleware** that solves the *context window bottleneck* in LLM-driven workflows.
+It runs locally, stores data locally (`~/.vidurai`), and serves context via the **Model Context Protocol (MCP)** and **IPC**.
 
-It sits between **developer environments** (IDE, terminal, browser) and **AI models**, ingesting high-velocity telemetry (file edits, terminal commands, AI chats), normalizing it via a **Shared Event Schema**, and applying **SF-V2 semantic compression** to maintain a **high-signal temporal graph** of a project.
-
-**Core capability:**
-Reduce tokens by 50–70% for AI prompts while preserving 100% of critical technical entities (file paths, stack traces, function names).
+> *विस्मृति भी विद्या है (Forgetting too is knowledge)* — The system intelligently compresses and forgets low-value context while preserving critical insights.
 
 ---
 
-## 1. Engineering Problem
+## Installation
 
-Raw developer activity is high-entropy:
-
-- **IDE:** rapid file saves, refactors, and diagnostics
-- **Terminal:** command spam, noisy logs
-- **Browser:** ad-hoc AI chats with half-remembered context
-
-Feeding these directly into an LLM causes:
-
-1. **Context saturation** – token limits hit long before the real history is represented.
-2. **State fragmentation** – VS Code, terminal, and browser all have partial views.
-3. **Hallucinations** – the model optimizes on recent noise instead of actual project state.
-4. **Runaway cost** – you pay for the same story over and over again.
-
-**Vidurai's role:**
-Act as a **local context layer** that continuously ingests signals, compresses them into durable "episodes", and serves **audience-specific context** back to tools and agents on demand.
-
----
-
-## 2. Architecture Overview (v2.0.0)
-
-```text
-       [VS Code]      [Browser UI]         [Terminal]
-           │               │                   │
-      (WebSocket)     (WebSocket)           (StdOut)
-           │               │                   │
-           ▼               ▼                   ▼
-    ┌────────────────────────────────────────────────┐
-    │              Vidurai Daemon (Local)            │
-    │  [Normalizer] → [SF-V2 Engine] → [SQLite/WAL]  │
-    └───────────────────────┬────────────────────────┘
-                            │  (HTTP / JSON)
-                ┌───────────┴───────────┐
-                ▼                       ▼
-          [Python SDK / CLI]      [LLM Proxy]
-        (Context Retrieval)     (Prompt Injection)
+### Step 1: Install the Brain
+We recommend `pipx` to isolate dependencies.
+```bash
+pipx install vidurai
+# OR
+pip install vidurai
 ```
 
-### Components
+### Step 2: Start the Guardian
+```bash
+vidurai start
+# Output: Vidurai Guardian started (PID: 12345)
+```
 
-#### 1. Vidurai SDK (this package)
-
-- Pydantic models for the Shared Event Schema
-- SF-V2 semantic compression engine
-- Local project client (`VismritiMemory`)
-- CLI tooling (`vidurai …`)
-
-#### 2. Vidurai Daemon (hub service)
-
-- **Stack:** Python 3.9+, FastAPI, AsyncIO
-- Runs on `localhost:7777`
-- Ingests events from VS Code / Browser / CLI
-- Performs entity extraction (paths, symbols, errors, IDs)
-- Applies SF-V2 scoring + consolidation
-- Persists to SQLite (`~/.vidurai/vidurai.db`, WAL mode)
-
-#### 3. VS Code Extension (sensor)
-
-- Watches file edits, terminal commands, and diagnostics
-- Emits structured `ViduraiEvent` messages to the daemon
-- Exposes "Copy Context for AI" command for one-click prompt injection
-
-#### 4. Browser Extension (sensor)
-
-- Targets AI chat UIs (ChatGPT, Claude, Gemini, etc.)
-- Captures prompts + responses as events
-- Injects Vidurai context into new chats via hotkey / UI actions
-
-#### 5. LLM Proxy (optional)
-
-- HTTP proxy around LLM APIs
-- Automatically attaches Vidurai gists to outbound prompts
-- Enables context-aware CLI tools, scripts, or agents
+### Verify Installation
+```bash
+vidurai --version
+vidurai status
+```
 
 ---
 
-## 3. Shared Event Schema
+## Integrations
 
-All tools speak the same language: `ViduraiEvent`.
+### 1. Visual Studio Code (Primary)
+The extension syncs active file context and terminal errors.
+* **Install:** Search for **"Vidurai"** in the VS Code Marketplace.
+* **Handshake:** Automatically connects to the daemon on startup.
 
+### 2. Cursor Editor (Native Support)
+Cursor works natively via the VS Code extension ecosystem.
+1. Download `vidurai-extension.vsix` from Releases.
+2. **Install via Terminal** (Recommended for reliability):
+   ```bash
+   cursor --install-extension vidurai-extension.vsix
+   ```
+
+### 3. Claude Desktop (MCP)
+Vidurai implements the Model Context Protocol.
+
+**Config Location:**
+- Linux/Mac: `~/.config/claude/claude_desktop_config.json`
+- Windows: `%APPDATA%\Claude\claude_desktop_config.json`
+
+**Config:**
 ```json
 {
-  "schema_version": "vidurai-events-v1",
-  "event_id": "d8c8a3f2-9c25-4e2a-9a4d-3f2e91f4b7a1",
-  "timestamp": "2025-11-26T18:30:00.123Z",
-  "source": "vscode",
-  "channel": "human",
-  "kind": "file_edit",
-  "project_root": "/home/user/vidurai",
-  "project_id": "proj_8f21b9a0",
-  "session_id": "sess_02c9b1d4",
-  "payload": {
-    "file_path": "vidurai/core/sf_v2.py",
-    "language": "python",
-    "change_type": "modified",
-    "summary": "Refactor scoring function"
+  "mcpServers": {
+    "vidurai": {
+      "command": "vidurai",
+      "args": ["server"]
+    }
   }
 }
 ```
 
-Backed by:
-
-- **Python:** `vidurai.shared.events` (`ViduraiEvent`, `EventKind`, etc.)
-- **TypeScript:** `src/shared/events.ts` in VS Code + browser extensions
-
-This schema is the contract between all sensors and the daemon.
+Or use the auto-installer:
+```bash
+vidurai mcp-install
+```
 
 ---
 
-## 4. SF-V2 Semantic Compression
+## CLI Reference (v2.2.0)
 
-Vidurai does not append logs forever.
+> Full reference: [docs/CLI.md](docs/CLI.md) (auto-generated via AST static analysis)
 
-SF-V2 runs a deterministic pipeline:
+### Daemon Control
+| Command | Description |
+| :--- | :--- |
+| `vidurai start` | Start the Vidurai Guardian daemon (background service). |
+| `vidurai stop` | Stop the Vidurai Guardian daemon. |
+| `vidurai status` | Show Vidurai Guardian daemon status. |
+| `vidurai logs` | Show or follow the Vidurai daemon logs (`-f` to follow). |
+| `vidurai info` | Show Vidurai installation information. |
 
-1. **Window selection** – select a time/window slice of events for a project.
-2. **Role classification** – label events as `CAUSE`, `ATTEMPT`, `FIX`, `NOISE`, etc.
-3. **Scoring** – compute retention scores using recency, frequency, and structural importance.
-4. **Consolidation** – merge low-value events into summaries while preserving hard entities (paths, line numbers, symbols, IDs).
-5. **Episode creation** – store high-density "episodes" that reflect how the project changed.
+### Memory Operations
+| Command | Description |
+| :--- | :--- |
+| `vidurai recall` | Recall memories from project database. |
+| `vidurai recent` | Show recent development activity. |
+| `vidurai context` | Get formatted context for AI tools (Claude Code, ChatGPT, etc.) |
+| `vidurai stats` | Show memory statistics for a project. |
+| `vidurai hygiene` | Memory hygiene - Review and archive low-utility memories. |
+| `vidurai hints` | Show proactive hints based on your development history. |
 
-Outputs are then exposed as **gists**:
+### Strategic Forgetting (SF-V2)
+| Command | Description |
+| :--- | :--- |
+| `vidurai pin` | Pin a memory to prevent it from being forgotten. |
+| `vidurai unpin` | Unpin a memory to allow forgetting. |
+| `vidurai pins` | List all pinned memories. |
+| `vidurai forgetting-log` | Show forgetting event log for transparency. |
+| `vidurai forgetting-stats` | Show forgetting statistics. |
 
-| Audience | Purpose |
-|----------|---------|
-| `AI` | token-bounded, machine-optimized context for LLM calls |
-| `DEVELOPER` | richer textual summary for humans |
-| `MANAGER` / `STAKEHOLDER` | higher-level progress narratives |
+### Import & Export
+| Command | Description |
+| :--- | :--- |
+| `vidurai ingest` | Ingest historical AI conversations (Ghost in the Shell). |
+| `vidurai export` | Export project memories to JSON/Text. |
+| `vidurai get-context-json` | Get project context as JSON (stdout only, for piping). |
+
+### Advanced & Debug
+| Command | Description |
+| :--- | :--- |
+| `vidurai audit` | Audit code for security risks. |
+| `vidurai fix` | Agentic Fixer (Shadow Mode). Safely modifies code in isolation. |
+| `vidurai chat` | Start the interactive Vidurai Voice session (REPL). |
+| `vidurai server` | Start MCP server for AI tool integration. |
+| `vidurai mcp-install` | Install Vidurai as MCP server for Claude Desktop. |
+| `vidurai clear` | Clear all memories for a project (irreversible!). |
 
 ---
 
-## 5. Security & Data Governance
+## Architecture
 
-Vidurai is built for zero-trust environments:
+```
++-------------------------------------------------------------+
+|                      YOUR MACHINE                           |
++-------------------------------------------------------------+
+|                                                             |
+|   +-----------+         +-----------------------------+     |
+|   |  VS Code  |<--IPC-->|                             |     |
+|   | Extension |         |    Vidurai Guardian         |     |
+|   +-----------+         |    (Background Daemon)      |     |
+|                         |                             |     |
+|   +-----------+         |  +-----------------------+  |     |
+|   |  Claude   |<--MCP-->|  |  Context Mediator    |  |     |
+|   |  Desktop  |         |  |  (Semantic Compress) |  |     |
+|   +-----------+         |  +-----------------------+  |     |
+|                         |            |                |     |
+|   +-----------+         |  +---------v-----------+    |     |
+|   |  Cursor   |<--IPC-->|  |  Memory Store       |    |     |
+|   |  Editor   |         |  |  (SQLite + Parquet) |    |     |
+|   +-----------+         |  +---------------------+    |     |
+|                         |                             |     |
+|                         +-----------------------------+     |
+|                                                             |
++-------------------------------------------------------------+
+```
 
-### Local-first storage
+### Storage Stack
+* **Hot Storage:** SQLite (Metadata) + sqlite-vec (Embeddings)
+* **Cold Storage:** Apache Parquet (Archives)
+* **Privacy:** All data in `$HOME/.vidurai`. PII (API Keys) redacted via Regex Gatekeeper.
+* **Learning:** Offline Reinforcement Learning (RL) prunes low-salience context.
 
-- Data lives in `~/.vidurai/` by default (SQLite + JSONL ledgers).
-- No mandatory cloud component.
-
-### Ingestion-time redaction
-
-- Pluggable regex filters to mask API keys, tokens, and secrets before persistence.
-
-### Transparency
-
-- Every compression / deletion decision is logged to a `forgetting_ledger.jsonl` for audit and debugging.
-- Nothing leaves the machine unless you explicitly configure a remote proxy or sync mechanism.
+### Data Directory
+```
+~/.vidurai/
+├── memory.db          # SQLite database (hot storage)
+├── vidurai.log        # Daemon logs (rotated, max 50MB)
+├── daemon.pid         # Process ID file
+└── archive/           # Parquet files (cold storage)
+    └── YYYY/MM/       # Partitioned by date
+```
 
 ---
 
-## 6. Installation & Deployment
-
-### 6.1 Python SDK
+## Quick Verification
 
 ```bash
-pip install vidurai
-```
+# Check daemon status
+vidurai status
 
-Requires Python 3.9+.
+# View recent logs
+vidurai logs -n 20
 
-### 6.2 Daemon (recommended: Docker)
+# Search memories
+vidurai recall --query "authentication"
 
-```bash
-docker run --rm -d \
-  -p 7777:7777 \
-  -v ~/.vidurai:/root/.vidurai \
-  chandantochandan/vidurai-daemon:2.0.0
-```
-
-This starts the Vidurai Daemon on `http://localhost:7777` with persistent state in `~/.vidurai`.
-
-### 6.3 Optional: LLM Proxy
-
-```bash
-docker run --rm -d \
-  -p 9999:9999 \
-  -v ~/.vidurai:/root/.vidurai \
-  chandantochandan/vidurai-proxy:2.0.0
-```
-
-Use this if you want Vidurai gists automatically injected into outbound LLM API calls.
-
----
-
-## 7. SDK Usage Example
-
-```python
-from vidurai.vismriti_memory import VismritiMemory
-
-# 1. Initialize memory for a project
-memory = VismritiMemory(project_path=".")
-
-# 2. Store a memory with automatic salience detection
-memory.remember(
-    gist="Refactored authentication module to use JWT tokens",
-    tags=["refactor", "auth", "jwt"],
-    metadata={"file": "auth/jwt_handler.py", "line": 42}
-)
-
-# 3. Recall relevant context
-results = memory.recall(
-    query="authentication implementation",
-    limit=5
-)
-
-for mem in results:
-    print(f"[{mem.salience}] {mem.gist}")
-
-# 4. Get compressed context for AI prompt injection
-context = memory.get_context(
-    query="current auth flow",
-    max_tokens=2000
-)
-
-print(f"Injecting context into LLM prompt:")
-print(context)
-```
-
-Typical uses:
-
-- Pre-pend context to prompts for ChatGPT/Claude/Gemini.
-- Feed specialized gists into autonomous agents / tools.
-- Generate manager-friendly status summaries.
-
----
-
-## 8. Integrations
-
-### VS Code Extension
-
-- **Marketplace ID:** `vidurai.vidurai`
-- Sends `file_edit`, `terminal_command`, and `diagnostics` events to the daemon.
-- Provides "Copy Vidurai Context" command for pasting into AI chats.
-
-### Browser Extension
-
-- Chrome MV3 extension (Universal AI Context).
-- Targets major AI UIs (ChatGPT, Claude, Gemini, etc.).
-- Can inject Vidurai context into new conversations.
-
-### CLI / Scripts
-
-- Use the SDK or HTTP API to pull audience-specific gists and attach them to prompts in custom tools or agents.
-
----
-
-## 9. Versioning & Legacy RL Engine
-
-- **Current release:** v2.0.0 – unified architecture around SF-V2 + shared events.
-- **Legacy RL-based v1.x:** preserved for reference in `docs/archive/implementation/`.
-
-The v2 line focuses on deterministic semantic compression and event-driven context, not on generic RL experimentation.
-
----
-
-## 10. Repository Layout
-
-```
-vidurai/                     # Python SDK (this package)
-vidurai-daemon/              # Local hub service
-vidurai-vscode-extension/    # VS Code telemetry extension
-vidurai-browser-extension/   # Browser AI context extension
-vidurai-proxy/               # Optional LLM proxy
-tests/                       # SDK tests
-docs/                        # Documentation
-  └── archive/
-      └── implementation/    # Historical PHASE_* docs
-ARCHITECTURE_OVERVIEW.md     # High-level system architecture
-CHANGELOG.md                 # Version history
+# Check memory health
+vidurai hygiene
 ```
 
 ---
 
-## 11. Links
+## Documentation
 
-- **Website:** https://vidurai.ai
-- **Docs:** https://docs.vidurai.ai
-- **Source:** https://github.com/chandantochandan/vidurai
-- **Issues:** https://github.com/chandantochandan/vidurai/issues
-- **Docker Hub:** https://hub.docker.com/u/chandantochandan
+| Document | Description |
+|----------|-------------|
+| [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Common issues and solutions |
+| [docs/SECURITY.md](docs/SECURITY.md) | Security policy and PII redaction |
+| [docs/CLI.md](docs/CLI.md) | Auto-generated CLI reference |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Contribution guidelines |
 
 ---
 
-## 12. License
+## License
 
-Vidurai is released under the **MIT License**.
-See the [LICENSE](https://github.com/chandantochandan/vidurai/blob/main/LICENSE) file for details.
+MIT License. See [LICENSE](LICENSE) for details.
+
+---
+
+**Vidurai** — *Because your AI should remember what you've already solved.*
+
+<div align="center">
+  <sub>विस्मृति भी विद्या है (Forgetting too is knowledge)</sub>
+</div>

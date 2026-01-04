@@ -26,6 +26,39 @@ from vidurai.core.passive_decay import PassiveDecayEngine
 from vidurai.core.active_unlearning import ActiveUnlearningEngine
 from vidurai.core.memory_ledger import MemoryLedger
 
+# Smart Query Sanitization: Stop words to filter out
+# These common words add noise to searches and should be removed
+STOP_WORDS = frozenset({
+    # Question words
+    "what", "which", "who", "whom", "whose", "where", "when", "why", "how",
+    # Articles
+    "a", "an", "the",
+    # Prepositions
+    "of", "in", "to", "for", "with", "on", "at", "from", "by", "about",
+    "into", "through", "during", "before", "after", "above", "below",
+    "between", "under", "over",
+    # Conjunctions
+    "and", "or", "but", "nor", "so", "yet",
+    # Pronouns
+    "i", "me", "my", "myself", "we", "our", "ours", "ourselves",
+    "you", "your", "yours", "yourself", "yourselves",
+    "he", "him", "his", "himself", "she", "her", "hers", "herself",
+    "it", "its", "itself", "they", "them", "their", "theirs", "themselves",
+    # Common verbs
+    "is", "are", "was", "were", "be", "been", "being",
+    "have", "has", "had", "having", "do", "does", "did", "doing",
+    "will", "would", "could", "should", "may", "might", "must", "shall",
+    "can", "need", "dare", "ought", "used",
+    # Common words
+    "this", "that", "these", "those", "there", "here",
+    "all", "each", "every", "both", "few", "more", "most", "other",
+    "some", "such", "no", "not", "only", "own", "same", "than", "too",
+    "very", "just", "also", "now", "then",
+    # Project-related noise
+    "project", "file", "code", "function", "class", "method",
+    "tell", "show", "explain", "describe", "give", "find", "get",
+})
+
 # Phase 6: Event Bus integration
 try:
     from vidurai.core.event_bus import EventBus, publish_event
@@ -145,8 +178,12 @@ class VismritiMemory:
             project_path: Project path for persistent storage (default: current directory)
         """
 
-        # v2.0: Project-level persistent storage
-        self.project_path = project_path or os.getcwd()
+        # [CTO Mandate] Force canonical absolute path to prevent split-brain projects
+        # This is the SINGLE SOURCE OF TRUTH for path normalization
+        # All paths like '.', './', '../foo', 'relative/path' become absolute
+        raw_path = project_path or os.getcwd()
+        self._project_path = os.path.abspath(raw_path)
+        self._project_id: Optional[int] = None  # Lazy-loaded, refreshed on path change
 
         # Core components (in-memory cache for backward compatibility)
         self.memories: List[Memory] = []
@@ -156,7 +193,9 @@ class VismritiMemory:
         if DATABASE_AVAILABLE:
             try:
                 self.db = MemoryDatabase()
-                logger.info(f"Database backend initialized for project: {self.project_path}")
+                # Initialize project_id now that db is available
+                self._project_id = self.db.get_or_create_project(self._project_path)
+                logger.info(f"Database backend initialized for project: {self._project_path}")
             except Exception as e:
                 logger.warning(f"Failed to initialize database: {e}, using in-memory only")
 
@@ -233,12 +272,88 @@ class VismritiMemory:
             f"multi_audience={self.multi_audience_generator is not None}"
         )
 
+    # -------------------------------------------------------------------------
+    # v2.5: Project Identity Properties (Auto-refresh on context switch)
+    # -------------------------------------------------------------------------
+
+    @property
+    def project_path(self) -> str:
+        """Get current project path"""
+        return self._project_path
+
+    @project_path.setter
+    def project_path(self, value: str) -> None:
+        """
+        Set project path and auto-refresh project_id.
+
+        This is the CRITICAL FIX for context switching:
+        When daemon switches projects, setting this property
+        automatically updates the project_id in the database.
+
+        [CTO Mandate] Also canonicalizes path to prevent split-brain.
+        """
+        # [CTO Mandate] Force canonical absolute path
+        canonical_path = os.path.abspath(value)
+        self._project_path = canonical_path
+        # AUTO-REFRESH ID: Ensure we read/write to correct project
+        if self.db:
+            self._project_id = self.db.get_or_create_project(canonical_path)
+            logger.debug(f"Project context switched: {canonical_path} (ID: {self._project_id})")
+
+    @property
+    def project_id(self) -> Optional[int]:
+        """
+        Get current project ID (lazy-loaded).
+
+        Returns the cached project_id, or fetches it if not set.
+        """
+        if self._project_id is None and self.db:
+            self._project_id = self.db.get_or_create_project(self._project_path)
+        return self._project_id
+
+    def _sanitize_query(self, query: str) -> List[str]:
+        """
+        Sanitize query for intersection search.
+
+        CTO Mandate: The Intersection Rule
+        - Lowercase the query
+        - Split into tokens
+        - Remove stop words
+        - Return list of meaningful keywords
+
+        Args:
+            query: Raw user query (e.g., "What was the architecture of project civi")
+
+        Returns:
+            List of keywords (e.g., ["architecture", "civi"])
+
+        Example:
+            >>> self._sanitize_query("What was the architecture of project civi")
+            ['architecture', 'civi']
+        """
+        if not query:
+            return []
+
+        # Lowercase and split on whitespace/punctuation
+        import re
+        tokens = re.split(r'[\s\-_.,;:!?"\'/\\()[\]{}]+', query.lower())
+
+        # Filter out stop words and empty tokens
+        keywords = [
+            token for token in tokens
+            if token and token not in STOP_WORDS and len(token) > 1
+        ]
+
+        logger.debug(f"Query sanitized: '{query}' -> {keywords}")
+        return keywords
+
     def remember(
         self,
         content: str,
         metadata: Optional[Dict[str, Any]] = None,
         salience: Optional[SalienceLevel] = None,
-        extract_gist: bool = True
+        extract_gist: bool = True,
+        created_at: Optional[datetime] = None  # Sprint 1.5: Allow historical timestamps
     ) -> Memory:
         """
         Store a new memory with intelligent processing
@@ -257,6 +372,9 @@ class VismritiMemory:
             metadata: Additional context
             salience: Override salience classification (optional)
             extract_gist: Extract gist from content (default: True)
+            created_at: Optional historical timestamp for ingested memories (Sprint 1.5)
+                       If None, current time is used. This enables ingestion of
+                       historical ChatGPT conversations with preserved timestamps.
 
         Returns:
             Created Memory object
@@ -265,6 +383,14 @@ class VismritiMemory:
             >>> memory.remember(
             ...     "Fixed authentication bug in auth.py",
             ...     metadata={"type": "bugfix", "file": "auth.py"}
+            ... )
+
+            # Sprint 1.5: Ingestion with historical timestamp
+            >>> from datetime import datetime
+            >>> memory.remember(
+            ...     "User asked about authentication",
+            ...     metadata={"type": "chatgpt_import", "source": "openai_export"},
+            ...     created_at=datetime(2024, 6, 15, 10, 30, 0)
             ... )
         """
 
@@ -375,7 +501,7 @@ class VismritiMemory:
                     )
                     memory_id = matching_memory_id
                 else:
-                    # Store new memory
+                    # Store new memory (Sprint 1.5: with optional created_at)
                     memory_id = self.db.store_memory(
                         project_path=self.project_path,
                         verbatim=verbatim,
@@ -385,7 +511,8 @@ class VismritiMemory:
                         file_path=metadata.get('file'),
                         line_number=metadata.get('line'),
                         tags=tags,
-                        retention_days=retention_days
+                        retention_days=retention_days,
+                        created_at=created_at  # Sprint 1.5: Historical timestamp support
                     )
 
                 # Phase 5: Generate and store audience-specific gists
@@ -1030,11 +1157,15 @@ class VismritiMemory:
 
         # Use database for efficient query
         try:
+            # Smart Query Sanitization for intersection search
+            keywords = self._sanitize_query(query) if query else None
+
             memories = self.db.recall_memories(
                 project_path=self.project_path,
                 query=query,
                 min_salience=DBSalienceLevel.MEDIUM,
-                limit=20
+                limit=20,
+                keywords=keywords  # Pass sanitized keywords for intersection search
             )
 
             if not memories:

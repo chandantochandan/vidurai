@@ -23,45 +23,51 @@ def test_schema_migration():
     # Create new database (will trigger migration)
     db = MemoryDatabase()
 
-    cursor = db.conn.cursor()
+    # Use public API for reading (v2.5 Queue-Based Actor pattern)
+    conn = db.get_connection_for_reading()
+    try:
+        cursor = conn.cursor()
 
-    # Check that audience_gists table exists
-    tables = cursor.execute("""
-        SELECT name FROM sqlite_master
-        WHERE type='table' AND name='audience_gists'
-    """).fetchall()
+        # Check that audience_gists table exists
+        tables = cursor.execute("""
+            SELECT name FROM sqlite_master
+            WHERE type='table' AND name='audience_gists'
+        """).fetchall()
 
-    print(f"audience_gists table exists: {len(tables) > 0}")
-    assert len(tables) > 0, "audience_gists table not created"
+        print(f"audience_gists table exists: {len(tables) > 0}")
+        assert len(tables) > 0, "audience_gists table not created"
 
-    # Check schema version
-    version = cursor.execute("""
-        SELECT value FROM metadata WHERE key='schema_version'
-    """).fetchone()
+        # Check schema version
+        version = cursor.execute("""
+            SELECT value FROM metadata WHERE key='schema_version'
+        """).fetchone()
 
-    print(f"Schema version: {version['value']}")
-    assert version['value'] == '2', "Schema not migrated to v2"
+        print(f"Schema version: {version['value']}")
+        assert int(version['value']) >= 2, "Schema not migrated to at least v2"
 
-    # Check table structure
-    schema = cursor.execute("PRAGMA table_info(audience_gists)").fetchall()
-    columns = {row[1]: row[2] for row in schema}
+        # Check table structure
+        schema = cursor.execute("PRAGMA table_info(audience_gists)").fetchall()
+        columns = {row[1]: row[2] for row in schema}
 
-    print(f"\naudience_gists columns:")
-    for col, typ in columns.items():
-        print(f"  {col}: {typ}")
+        print(f"\naudience_gists columns:")
+        for col, typ in columns.items():
+            print(f"  {col}: {typ}")
 
-    assert 'memory_id' in columns, "memory_id column missing"
-    assert 'audience' in columns, "audience column missing"
-    assert 'gist' in columns, "gist column missing"
+        assert 'memory_id' in columns, "memory_id column missing"
+        assert 'audience' in columns, "audience column missing"
+        assert 'gist' in columns, "gist column missing"
 
-    # Check indexes
-    indexes = cursor.execute("""
-        SELECT name FROM sqlite_master
-        WHERE type='index' AND tbl_name='audience_gists'
-    """).fetchall()
+        # Check indexes
+        indexes = cursor.execute("""
+            SELECT name FROM sqlite_master
+            WHERE type='index' AND tbl_name='audience_gists'
+        """).fetchall()
 
-    print(f"\nIndexes: {[idx[0] for idx in indexes]}")
-    assert len(indexes) >= 2, "Expected at least 2 indexes"
+        print(f"\nIndexes: {[idx[0] for idx in indexes]}")
+        assert len(indexes) >= 2, "Expected at least 2 indexes"
+
+    finally:
+        conn.close()
 
     print("\n✅ PASSED: Schema migration successful\n")
 
@@ -99,17 +105,21 @@ def test_store_audience_gists():
     db.store_audience_gists(memory_id, gists)
     print(f"✅ Stored {len(gists)} audience gists")
 
-    # Verify they were stored
-    cursor = db.conn.cursor()
-    stored = cursor.execute("""
-        SELECT audience, gist FROM audience_gists WHERE memory_id = ?
-    """, (memory_id,)).fetchall()
+    # Verify they were stored (use public API)
+    conn = db.get_connection_for_reading()
+    try:
+        cursor = conn.cursor()
+        stored = cursor.execute("""
+            SELECT audience, gist FROM audience_gists WHERE memory_id = ?
+        """, (memory_id,)).fetchall()
 
-    print(f"\nStored gists in database:")
-    for row in stored:
-        print(f"  {row['audience']}: {row['gist'][:50]}...")
+        print(f"\nStored gists in database:")
+        for row in stored:
+            print(f"  {row['audience']}: {row['gist'][:50]}...")
 
-    assert len(stored) == 4, f"Expected 4 gists, got {len(stored)}"
+        assert len(stored) == 4, f"Expected 4 gists, got {len(stored)}"
+    finally:
+        conn.close()
 
     print("\n✅ PASSED: Audience gists stored successfully\n")
 
@@ -151,21 +161,25 @@ def test_upsert_audience_gists():
     db.store_audience_gists(memory_id, gists_v2)
     print("Stored version 2 gists (UPSERT)")
 
-    # Verify
-    cursor = db.conn.cursor()
-    final = cursor.execute("""
-        SELECT audience, gist FROM audience_gists WHERE memory_id = ?
-    """, (memory_id,)).fetchall()
+    # Verify (use public API)
+    conn = db.get_connection_for_reading()
+    try:
+        cursor = conn.cursor()
+        final = cursor.execute("""
+            SELECT audience, gist FROM audience_gists WHERE memory_id = ?
+        """, (memory_id,)).fetchall()
 
-    print(f"\nFinal gists:")
-    for row in final:
-        print(f"  {row['audience']}: {row['gist']}")
+        print(f"\nFinal gists:")
+        for row in final:
+            print(f"  {row['audience']}: {row['gist']}")
 
-    assert len(final) == 3, f"Expected 3 gists, got {len(final)}"
+        assert len(final) == 3, f"Expected 3 gists, got {len(final)}"
 
-    # Check that developer was updated (not duplicated)
-    dev_gist = [r['gist'] for r in final if r['audience'] == 'developer'][0]
-    assert "Version 2" in dev_gist, "Developer gist not updated"
+        # Check that developer was updated (not duplicated)
+        dev_gist = [r['gist'] for r in final if r['audience'] == 'developer'][0]
+        assert "Version 2" in dev_gist, "Developer gist not updated"
+    finally:
+        conn.close()
 
     print("\n✅ PASSED: UPSERT works correctly\n")
 
@@ -257,10 +271,9 @@ def test_cascade_delete():
     print(f"Before delete: {len(before)} gists")
     assert len(before) == 4, "Gists should exist"
 
-    # Delete the memory
-    cursor = db.conn.cursor()
-    cursor.execute("DELETE FROM memories WHERE id = ?", (memory_id,))
-    db.conn.commit()
+    # Delete the memory (use _enqueue for write operations)
+    future = db._enqueue("DELETE FROM memories WHERE id = ?", (memory_id,))
+    future.result()
     print(f"Deleted memory {memory_id}")
 
     # Verify gists are deleted (CASCADE)
@@ -291,44 +304,46 @@ def test_unique_constraint():
         event_type="test"
     )
 
-    cursor = db.conn.cursor()
-
-    # Insert first gist
-    cursor.execute("""
+    # Insert first gist via _enqueue (v2.5 pattern)
+    future = db._enqueue("""
         INSERT INTO audience_gists (memory_id, audience, gist)
         VALUES (?, 'developer', 'Version 1')
     """, (memory_id,))
-    db.conn.commit()
+    future.result()
     print("Inserted developer gist v1")
 
     # Try to insert duplicate (should fail without OR REPLACE)
     try:
-        cursor.execute("""
+        future = db._enqueue("""
             INSERT INTO audience_gists (memory_id, audience, gist)
             VALUES (?, 'developer', 'Version 2')
         """, (memory_id,))
-        db.conn.commit()
+        future.result()
         print("❌ FAILED: Duplicate insert should have raised error")
         assert False, "UNIQUE constraint not enforced"
     except Exception as e:
         print(f"✅ Duplicate rejected: {type(e).__name__}")
-        db.conn.rollback()
 
     # But INSERT OR REPLACE should work (what we use in store_audience_gists)
-    cursor.execute("""
+    future = db._enqueue("""
         INSERT OR REPLACE INTO audience_gists (memory_id, audience, gist)
         VALUES (?, 'developer', 'Version 2')
     """, (memory_id,))
-    db.conn.commit()
+    future.result()
     print("INSERT OR REPLACE succeeded")
 
-    # Verify only one row exists
-    count = cursor.execute("""
-        SELECT COUNT(*) FROM audience_gists
-        WHERE memory_id = ? AND audience = 'developer'
-    """, (memory_id,)).fetchone()[0]
+    # Verify only one row exists (use public API for reading)
+    conn = db.get_connection_for_reading()
+    try:
+        cursor = conn.cursor()
+        count = cursor.execute("""
+            SELECT COUNT(*) FROM audience_gists
+            WHERE memory_id = ? AND audience = 'developer'
+        """, (memory_id,)).fetchone()[0]
 
-    assert count == 1, "Should have exactly 1 row (updated, not duplicated)"
+        assert count == 1, "Should have exactly 1 row (updated, not duplicated)"
+    finally:
+        conn.close()
 
     print("\n✅ PASSED: UNIQUE constraint enforced\n")
 

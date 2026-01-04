@@ -1,0 +1,32 @@
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <!-- Vidurai Logo: Three interlocking circles representing the Three Koshas -->
+  <defs>
+    <linearGradient id="gradient1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3ECC5F;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#44D860;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="gradient2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#2196F3;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1976D2;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="gradient3" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#9C27B0;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#7B1FA2;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Outer circle (Vijnanamaya Kosha - Wisdom) -->
+  <circle cx="100" cy="70" r="45" fill="url(#gradient3)" opacity="0.7"/>
+
+  <!-- Middle circle (Manomaya Kosha - Mental) -->
+  <circle cx="75" cy="115" r="45" fill="url(#gradient2)" opacity="0.7"/>
+
+  <!-- Inner circle (Annamaya Kosha - Physical) -->
+  <circle cx="125" cy="115" r="45" fill="url(#gradient1)" opacity="0.7"/>
+
+  <!-- Center intersection - represents unified memory -->
+  <circle cx="100" cy="100" r="15" fill="#FFFFFF" opacity="0.9"/>
+
+  <!-- V letter in center -->
+  <text x="100" y="110" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="#333" text-anchor="middle">V</text>
+</svg>

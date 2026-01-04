@@ -1,0 +1,36 @@
+include README.md
+include LICENSE
+include pyproject.toml
+
+# Core Python Source
+recursive-include vidurai *.py
+include vidurai/shared/events.py
+
+# EXCLUDE Test Files (Keep source clean, but don't ship tests)
+global-exclude test_*.py
+global-exclude *_test.py
+
+# EXCLUDE Non-Python Artifacts (No TS, No JS)
+prune vidurai-vscode-extension
+prune vidurai-browser-extension
+prune vidurai-proxy
+prune tests
+prune archive
+prune experiments
+prune scripts
+
+# EXCLUDE Monorepo Projects (website and docs sites)
+prune website
+prune docs
+global-exclude node_modules
+global-exclude *.ts
+global-exclude *.tsx
+global-exclude *.js
+global-exclude *.jsx
+global-exclude *.css
+global-exclude *.scss
+
+# Global Junk
+global-exclude *.pyc
+global-exclude __pycache__
+global-exclude .DS_Store

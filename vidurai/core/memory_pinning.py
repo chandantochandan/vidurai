@@ -5,12 +5,18 @@ Allows users to pin critical memories that should never be forgotten
 Philosophy: "Trust the system, but control what matters most"
 विस्मृति भी विद्या है (Forgetting too is knowledge)
 
+v2.5: Updated to use MemoryDatabase public API (Queue-Based Actor pattern)
+- No direct self.db.conn access (prevents lock contention)
+- All writes route through _enqueue via public API
+- All reads use get_connection_for_reading via public API
+
 Research Foundation:
 - User agency in automated systems
 - Hybrid human-AI memory management
 - Exception handling in forgetting policies
 """
 
+import json
 from typing import List, Optional, Dict, Any, Set
 from dataclasses import dataclass, asdict
 from datetime import datetime
@@ -45,6 +51,8 @@ class MemoryPinManager:
     - Cannot be compressed
     - Cannot decay with age
     - Always included in relevant queries
+
+    v2.5: Uses MemoryDatabase public API to avoid lock contention
     """
 
     def __init__(self, db, max_pins_per_project: int = 50):
@@ -58,7 +66,7 @@ class MemoryPinManager:
         self.db = db
         self.max_pins_per_project = max_pins_per_project
 
-        # Ensure pinned column exists
+        # Ensure pinned column exists (uses public API)
         self._ensure_pin_column()
 
         logger.debug(f"Memory pin manager initialized (max pins: {max_pins_per_project})")
@@ -66,28 +74,16 @@ class MemoryPinManager:
     def _ensure_pin_column(self):
         """Ensure the 'pinned' column exists in memories table"""
         try:
-            cursor = self.db.conn.cursor()
-
-            # Check if column exists
-            cursor.execute("PRAGMA table_info(memories)")
-            columns = [row[1] for row in cursor.fetchall()]
-
-            if 'pinned' not in columns:
-                # Add column
-                cursor.execute("ALTER TABLE memories ADD COLUMN pinned INTEGER DEFAULT 0")
-
-                # Create index
-                cursor.execute(
-                    "CREATE INDEX IF NOT EXISTS idx_memories_pinned "
-                    "ON memories(pinned) WHERE pinned = 1"
+            # Use public API for schema check and modification
+            if not self.db.check_table_column('memories', 'pinned'):
+                self.db.add_column_if_missing('memories', 'pinned', 'INTEGER DEFAULT 0')
+                self.db.create_index_if_missing(
+                    'idx_memories_pinned',
+                    "CREATE INDEX IF NOT EXISTS idx_memories_pinned ON memories(pinned) WHERE pinned = 1"
                 )
-
-                self.db.conn.commit()
                 logger.info("Added 'pinned' column to memories table")
-
         except Exception as e:
             logger.error(f"Error ensuring pin column: {e}")
-            self.db.conn.rollback()
 
     def pin(
         self,
@@ -116,7 +112,7 @@ class MemoryPinManager:
             project_id = memory['project_id']
 
             # Check pin limit
-            current_pins = self.get_pin_count(project_id)
+            current_pins = self.db.get_pin_count(project_id)
             if current_pins >= self.max_pins_per_project:
                 logger.warning(
                     f"Cannot pin: project has {current_pins}/{self.max_pins_per_project} pins"
@@ -128,18 +124,12 @@ class MemoryPinManager:
                 logger.debug(f"Memory {memory_id} is already pinned")
                 return True
 
-            # Pin the memory
-            cursor = self.db.conn.cursor()
-            cursor.execute(
-                "UPDATE memories SET pinned = 1 WHERE id = ?",
-                (memory_id,)
-            )
-
-            # Store pin metadata in tags
-            tags = memory.get('tags', [])
+            # Build updated tags with pin metadata
+            tags = memory.get('tags') or []
             if isinstance(tags, str):
-                import json
                 tags = json.loads(tags) if tags else []
+            elif tags is None:
+                tags = []
 
             pin_metadata = {
                 'pinned_at': datetime.now().isoformat(),
@@ -148,19 +138,104 @@ class MemoryPinManager:
             if reason:
                 pin_metadata['pin_reason'] = reason
 
-            tags.append(f"pin_metadata:{pin_metadata}")
-            cursor.execute(
-                "UPDATE memories SET tags = ? WHERE id = ?",
-                (json.dumps(tags), memory_id)
-            )
+            tags.append(f"pin_metadata:{json.dumps(pin_metadata)}")
 
-            self.db.conn.commit()
-            logger.info(f"Pinned memory {memory_id} (reason: {reason or 'none'})")
-            return True
+            # Pin the memory using public API
+            result = self.db.set_memory_pinned(memory_id, True, json.dumps(tags))
+
+            if result > 0:
+                logger.info(f"Pinned memory {memory_id} (reason: {reason or 'none'})")
+                return True
+            return False
 
         except Exception as e:
             logger.error(f"Error pinning memory {memory_id}: {e}")
-            self.db.conn.rollback()
+            return False
+
+    def pin_by_path(
+        self,
+        file_path: str,
+        project_path: str,
+        reason: Optional[str] = None,
+        pinned_by: str = 'user'
+    ) -> bool:
+        """
+        Pin a memory by file path, creating a placeholder if memory doesn't exist.
+
+        Args:
+            file_path: Path to the file to pin
+            project_path: Project path for context
+            reason: Optional reason for pinning
+            pinned_by: Who pinned it ('user' or 'auto')
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            # Look up existing memory by file path using public API
+            project_id = self.db.get_or_create_project(project_path)
+            memory = self.db.get_memory_by_path(project_id, file_path)
+
+            if memory:
+                # Memory exists, pin it
+                memory_id = memory['id']
+                logger.debug(f"Found existing memory {memory_id} for {file_path}")
+                return self.pin(memory_id, reason, pinned_by)
+            else:
+                # No memory exists - create a placeholder using public API
+                logger.info(f"No memory for {file_path}, creating placeholder")
+
+                memory_id = self.db.create_pinned_placeholder(
+                    project_id=project_id,
+                    file_path=file_path,
+                    verbatim=f"Pinned file: {file_path}",
+                    gist="User pinned file for permanent retention",
+                    salience='CRITICAL',
+                    event_type='user_pinned'
+                )
+
+                logger.info(f"Created placeholder memory {memory_id} for {file_path}")
+
+                # Add pin metadata
+                return self._add_pin_metadata(memory_id, reason, pinned_by)
+
+        except Exception as e:
+            logger.error(f"Error pinning by path {file_path}: {e}")
+            return False
+
+    def _add_pin_metadata(
+        self,
+        memory_id: int,
+        reason: Optional[str],
+        pinned_by: str
+    ) -> bool:
+        """Add pin metadata to a memory's tags"""
+        try:
+            memory = self.db.get_memory_by_id(memory_id)
+            if not memory:
+                return False
+
+            tags = memory.get('tags') or []
+            if isinstance(tags, str):
+                tags = json.loads(tags) if tags else []
+            elif tags is None:
+                tags = []
+
+            pin_metadata = {
+                'pinned_at': datetime.now().isoformat(),
+                'pinned_by': pinned_by,
+            }
+            if reason:
+                pin_metadata['pin_reason'] = reason
+
+            tags.append(f"pin_metadata:{json.dumps(pin_metadata)}")
+
+            # Update tags using public API
+            result = self.db.set_memory_pinned(memory_id, True, json.dumps(tags))
+            return result > 0
+
+        except Exception as e:
+            logger.error(f"Error adding pin metadata: {e}")
             return False
 
     def unpin(self, memory_id: int) -> bool:
@@ -174,19 +249,42 @@ class MemoryPinManager:
             True if successful, False otherwise
         """
         try:
-            cursor = self.db.conn.cursor()
-            cursor.execute(
-                "UPDATE memories SET pinned = 0 WHERE id = ?",
-                (memory_id,)
-            )
-            self.db.conn.commit()
+            # Use public API to unpin
+            result = self.db.set_memory_pinned(memory_id, False)
 
-            logger.info(f"Unpinned memory {memory_id}")
-            return True
+            if result > 0:
+                logger.info(f"Unpinned memory {memory_id}")
+                return True
+            return True  # Memory might not exist, but that's not an error
 
         except Exception as e:
             logger.error(f"Error unpinning memory {memory_id}: {e}")
-            self.db.conn.rollback()
+            return False
+
+    def unpin_by_path(self, file_path: str, project_path: str) -> bool:
+        """
+        Unpin a memory by file path.
+
+        Args:
+            file_path: Path to the file to unpin
+            project_path: Project path for context
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            # Look up memory by file path using public API
+            project_id = self.db.get_or_create_project(project_path)
+            memory = self.db.get_pinned_memory_by_path(project_id, file_path)
+
+            if not memory:
+                logger.debug(f"No pinned memory found for {file_path}")
+                return True  # Not an error - just nothing to unpin
+
+            return self.unpin(memory['id'])
+
+        except Exception as e:
+            logger.error(f"Error unpinning by path {file_path}: {e}")
             return False
 
     def is_pinned(self, memory_id: int) -> bool:
@@ -222,21 +320,7 @@ class MemoryPinManager:
         """
         try:
             project_id = self.db.get_or_create_project(project_path)
-
-            cursor = self.db.conn.cursor()
-            cursor.execute(
-                """
-                SELECT id, verbatim, gist, salience, event_type,
-                       file_path, line_number, tags, created_at, last_accessed
-                FROM memories
-                WHERE project_id = ? AND pinned = 1
-                ORDER BY created_at DESC
-                """,
-                (project_id,)
-            )
-
-            memories = [dict(row) for row in cursor.fetchall()]
-            return memories
+            return self.db.get_pinned_memories(project_id)
 
         except Exception as e:
             logger.error(f"Error getting pinned memories: {e}")
@@ -266,14 +350,7 @@ class MemoryPinManager:
             Count of pinned memories
         """
         try:
-            cursor = self.db.conn.cursor()
-            cursor.execute(
-                "SELECT COUNT(*) FROM memories WHERE project_id = ? AND pinned = 1",
-                (project_id,)
-            )
-            count = cursor.fetchone()[0]
-            return count
-
+            return self.db.get_pin_count(project_id)
         except Exception as e:
             logger.error(f"Error getting pin count: {e}")
             return 0
@@ -302,26 +379,11 @@ class MemoryPinManager:
         try:
             project_id = self.db.get_or_create_project(project_path)
 
-            cursor = self.db.conn.cursor()
-
-            # Get unpinned memories with high value
-            cursor.execute(
-                """
-                SELECT id, verbatim, gist, salience, event_type,
-                       access_count, last_accessed, tags
-                FROM memories
-                WHERE project_id = ?
-                  AND pinned = 0
-                  AND salience IN ('CRITICAL', 'HIGH')
-                ORDER BY access_count DESC, salience DESC
-                LIMIT ?
-                """,
-                (project_id, limit)
-            )
+            # Get suggestions using public API
+            candidates = self.db.get_suggested_pins(project_id, limit)
 
             suggestions = []
-            for row in cursor.fetchall():
-                memory = dict(row)
+            for memory in candidates:
                 suggestions.append({
                     'memory': memory,
                     'reason': self._generate_suggestion_reason(memory),
@@ -360,7 +422,7 @@ class MemoryPinManager:
 
             # Check if already at pin limit
             project_id = memory['project_id']
-            current_pins = self.get_pin_count(project_id)
+            current_pins = self.db.get_pin_count(project_id)
             if current_pins >= self.max_pins_per_project:
                 return False
 
@@ -420,42 +482,9 @@ class MemoryPinManager:
     def get_statistics(self) -> Dict[str, Any]:
         """Get pinning statistics across all projects"""
         try:
-            cursor = self.db.conn.cursor()
-
-            # Total pins
-            cursor.execute("SELECT COUNT(*) FROM memories WHERE pinned = 1")
-            total_pins = cursor.fetchone()[0]
-
-            # Pins by salience
-            cursor.execute(
-                """
-                SELECT salience, COUNT(*) as count
-                FROM memories
-                WHERE pinned = 1
-                GROUP BY salience
-                """
-            )
-            by_salience = {row[0]: row[1] for row in cursor.fetchall()}
-
-            # Pins by project
-            cursor.execute(
-                """
-                SELECT p.path, COUNT(*) as count
-                FROM memories m
-                JOIN projects p ON m.project_id = p.id
-                WHERE m.pinned = 1
-                GROUP BY p.path
-                """
-            )
-            by_project = {row[0]: row[1] for row in cursor.fetchall()}
-
-            return {
-                'total_pins': total_pins,
-                'max_pins_per_project': self.max_pins_per_project,
-                'by_salience': by_salience,
-                'by_project': by_project,
-            }
-
+            stats = self.db.get_pin_statistics()
+            stats['max_pins_per_project'] = self.max_pins_per_project
+            return stats
         except Exception as e:
             logger.error(f"Error getting pin statistics: {e}")
             return {}

@@ -91,7 +91,7 @@ class BasePayload(BaseModel):
     """
 
     class Config:
-        extra = "allow"  # Allow additional fields
+        extra = "forbid"  # Enforce strict schema validation
 
 
 class ViduraiEvent(BaseModel):
@@ -172,6 +172,7 @@ class ViduraiEvent(BaseModel):
 
     class Config:
         use_enum_values = True  # Serialize enums as strings
+        extra = "forbid"  # Enforce strict schema validation
 
 
 # =============================================================================

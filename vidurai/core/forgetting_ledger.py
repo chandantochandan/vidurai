@@ -407,37 +407,15 @@ class ForgettingLedger:
 
         return "\n".join(lines)
 
-    def clear_old_events(self, older_than_days: int = 365):
-        """
-        Remove events older than specified days
-
-        Args:
-            older_than_days: Keep only events from last N days
-
-        Returns:
-            Number of events removed
-        """
-        try:
-            cutoff = datetime.now() - timedelta(days=older_than_days)
-            events = self.get_events(since=cutoff, limit=100000)
-
-            # Rewrite ledger with only recent events
-            temp_path = self.ledger_path.with_suffix('.tmp')
-
-            with open(temp_path, 'w') as f:
-                for event in events:
-                    f.write(json.dumps(event.to_dict()) + '\n')
-
-            # Replace original file
-            temp_path.replace(self.ledger_path)
-
-            removed_count = len(self.get_events(limit=100000)) - len(events)
-            logger.info(f"Cleared {removed_count} events older than {older_than_days} days")
-            return removed_count
-
-        except Exception as e:
-            logger.error(f"Error clearing old events: {e}")
-            return 0
+    # DEPRECATED: Removed to enforce append-only immutability compliance (v2.2.0 Audit).
+    # def clear_old_events(self, older_than_days: int = 365):
+    #     """
+    #     Remove events older than specified days
+    #     
+    #     REMOVED: This method violated the append-only immutability rule.
+    #     The forgetting ledger must remain append-only for audit compliance.
+    #     """
+    #     pass
 
 
 # Global ledger instance

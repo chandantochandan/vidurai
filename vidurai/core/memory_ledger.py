@@ -17,12 +17,15 @@ Provides users with complete visibility into:
 जय विदुराई! 🕉️
 """
 
-import pandas as pd
+# Glass Box Protocol: Lazy Loading - pandas imported inside functions that need it
 from datetime import datetime
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, TYPE_CHECKING
 from loguru import logger
 
 from vidurai.core.data_structures_v3 import Memory, MemoryStatus, SalienceLevel
+
+if TYPE_CHECKING:
+    import pandas as pd
 
 
 class MemoryLedger:
@@ -56,7 +59,7 @@ class MemoryLedger:
 
         logger.debug(f"MemoryLedger initialized with {len(memories)} memories")
 
-    def get_ledger(self, include_pruned: bool = False) -> pd.DataFrame:
+    def get_ledger(self, include_pruned: bool = False) -> 'pd.DataFrame':
         """
         Generate comprehensive memory ledger
 
@@ -69,6 +72,8 @@ class MemoryLedger:
         Returns:
             Pandas DataFrame with memory ledger
         """
+        # Glass Box Protocol: Lazy Loading - import pandas only when this method is called
+        import pandas as pd
 
         ledger_data = []
 

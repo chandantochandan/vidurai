@@ -1,0 +1,34 @@
+# Vidurai Daemon v2.2.0-Guardian
+# Build from root directory: docker build -f Dockerfile.daemon -t vidurai-daemon:2.2.0 .
+
+FROM python:3.10-slim
+
+WORKDIR /app
+
+# Install system deps
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      build-essential git && \
+      rm -rf /var/lib/apt/lists/*
+
+# Copy Vidurai SDK (includes daemon as subpackage)
+COPY vidurai /app/vidurai
+COPY pyproject.toml /app/pyproject.toml
+COPY README.md /app/README.md
+
+# Install SDK (editable mode)
+RUN pip install --no-cache-dir -e .
+
+# Install daemon dependencies (FastAPI stack + utilities)
+RUN pip install --no-cache-dir \
+    fastapi>=0.104.0 \
+    uvicorn[standard]>=0.24.0 \
+    websockets>=12.0 \
+    watchdog>=3.0.0 \
+    pydantic>=2.0.0 \
+    loguru>=0.7.0 \
+    requests>=2.31.0
+
+EXPOSE 7777
+
+# Run daemon as Python module (Phase 7.0 structure)
+CMD ["python", "-m", "vidurai.daemon"]

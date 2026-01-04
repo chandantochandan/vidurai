@@ -9,9 +9,8 @@ import os
 from pathlib import Path
 from datetime import datetime
 
-# Add paths
-sys.path.insert(0, str(Path(__file__).parent))
-sys.path.insert(0, str(Path(__file__).parent / "vidurai-daemon"))
+# Add parent directory for imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 def setup_test_memories():
     """
@@ -117,7 +116,7 @@ def test_memory_bridge_direct():
     print()
 
     from vidurai.storage.database import MemoryDatabase
-    from intelligence.memory_bridge import MemoryBridge
+    from vidurai.daemon.intelligence.memory_bridge import MemoryBridge
 
     # Initialize
     db = MemoryDatabase()
@@ -184,7 +183,7 @@ def test_context_mediator_with_sql():
     print("=" * 60)
     print()
 
-    from intelligence.context_mediator import ContextMediator
+    from vidurai.daemon.intelligence.context_mediator import ContextMediator
 
     # Initialize context mediator (should auto-init memory bridge)
     mediator = ContextMediator()
@@ -255,7 +254,7 @@ def test_fail_safe_without_sql():
     db_module.MemoryDatabase = BrokenDatabase
 
     try:
-        from intelligence.context_mediator import ContextMediator
+        from vidurai.daemon.intelligence.context_mediator import ContextMediator
 
         # This should NOT crash even with broken database
         mediator = ContextMediator()
