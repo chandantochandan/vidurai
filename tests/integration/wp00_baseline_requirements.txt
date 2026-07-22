@@ -1,0 +1,8 @@
+# Historical WP-00 Baseline Harness
+# This is NOT the supported Vidurai installation method.
+# It exists solely to provide the minimum missing dependencies
+# required to run the currently verified core journey in CI
+# because they are inconsistently declared in the baseline pyproject.toml.
+
+fastapi>=0.104.0
+uvicorn>=0.24.0
