@@ -942,11 +942,13 @@ def ingest(file_path, source_type, project, dry_run, preview, skip_system):
         vidurai ingest export.json --dry-run                 # Count without storing
         vidurai ingest export.json --project /my/project     # Store to specific project
     """
-    # [CTO Mandate] Canonicalize path to prevent split-brain projects
     project = os.path.abspath(project)
-    if not INGESTION_AVAILABLE:
-        click.echo("❌ Ingestion module not available. Check installation.", err=True)
-        click.echo("   Try: pip install ijson>=3.2.0", err=True)
+
+    try:
+        from vidurai.core.ingestion.manager import IngestionManager
+    except ImportError:
+        click.echo("❌ This feature requires optional ingestion dependencies.", err=True)
+        click.echo("   Install them with: pip install \"vidurai[ingestion]\"", err=True)
         sys.exit(1)
 
     file_path = Path(file_path)

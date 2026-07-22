@@ -50,14 +50,14 @@ class LLMClient:
                 import openai
                 self._client = openai.OpenAI(api_key=self.api_key)
             except ImportError:
-                raise ImportError("OpenAI package not installed. Run: pip install openai")
+                raise ImportError("This feature requires optional AI dependencies. Install them with: pip install \"vidurai[ai]\"")
         
         elif self.provider == "anthropic":
             try:
                 import anthropic
                 self._client = anthropic.Anthropic(api_key=self.api_key)
             except ImportError:
-                raise ImportError("Anthropic package not installed. Run: pip install anthropic")
+                raise ImportError("This feature requires optional AI dependencies. Install them with: pip install \"vidurai[ai]\"")
         
         return self._client
     

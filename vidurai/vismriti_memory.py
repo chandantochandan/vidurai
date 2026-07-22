@@ -78,10 +78,11 @@ except Exception:
 # Optional gist extraction (requires OpenAI API key)
 try:
     from vidurai.core.gist_extractor import GistExtractor
+    import openai  # Explicit check for optional dependency
     GIST_EXTRACTION_AVAILABLE = True
-except Exception:
+except ImportError:
     GIST_EXTRACTION_AVAILABLE = False
-    logger.warning("Gist extraction unavailable (OpenAI API key not set)")
+    logger.warning("Gist extraction unavailable (OpenAI missing or API key not set)")
 
 # Optional RL agent integration
 try:

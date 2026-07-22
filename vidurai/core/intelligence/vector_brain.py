@@ -88,12 +88,13 @@ class VectorEngine:
                 if self._model is None:
                     logger.info(f"Loading embedding model: {MODEL_NAME}...")
 
-                    # Glass Box: LAZY IMPORT - Critical for startup time
-                    from sentence_transformers import SentenceTransformer
-
-                    self._model = SentenceTransformer(MODEL_NAME)
-                    self._initialized = True
-                    logger.info(f"   Embedding model loaded (dims={VECTOR_DIMENSIONS})")
+                    try:
+                        from sentence_transformers import SentenceTransformer
+                        self._model = SentenceTransformer(MODEL_NAME)
+                        self._initialized = True
+                        logger.info(f"   Embedding model loaded (dims={VECTOR_DIMENSIONS})")
+                    except ImportError:
+                        raise ImportError("This feature requires optional AI dependencies. Install them with: pip install \"vidurai[local-embeddings]\"")
 
         return self._model
 

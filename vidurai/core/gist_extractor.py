@@ -46,30 +46,12 @@ class GistExtractor:
     def extract(self, verbatim: str, context: Optional[Dict] = None) -> str:
         """
         Extract semantic gist from verbatim input
-
-        Research Principle: "Gist is meaning, not words"
-
-        Args:
-            verbatim: Raw, literal input
-            context: Additional context (type, action, metadata)
-
-        Returns:
-            Semantic gist (1-2 sentences maximum)
-
-        Example:
-            >>> extractor = GistExtractor()
-            >>> verbatim = "User opened file.py, made changes, saved, then opened test.py"
-            >>> gist = extractor.extract(verbatim, {"action": "coding"})
-            >>> print(gist)
-            "User edited file.py and moved to testing"
         """
-
         # Build context string
         context_str = ""
         if context:
             context_str = f"\nContext: {context}"
 
-        # Research-based prompt: Focus on WHAT and WHY, not exact words
         prompt = f"""Extract the core semantic meaning in ONE concise sentence.
 Focus on WHAT was done and WHY, not the exact words used.
 Be extremely concise - maximum 15 words.
@@ -78,20 +60,17 @@ Verbatim input: {verbatim}{context_str}
 
 Semantic gist (one sentence, <15 words):"""
 
-        try:
-            gist = self._call_llm(prompt)
-            return gist.strip()
-        except Exception as e:
-            # Fallback: Use first sentence of verbatim
-            return verbatim.split('.')[0][:100] if verbatim else "Unable to extract gist"
+        gist = self._call_llm(prompt)
+        return gist.strip()
 
     def _call_llm(self, prompt: str) -> str:
         """
         Call LLM for gist extraction
-
-        Uses gpt-4o-mini for cost efficiency (gist extraction is simple task)
         """
-        from openai import OpenAI
+        try:
+            from openai import OpenAI
+        except ImportError:
+            raise ImportError("This feature requires optional AI dependencies. Install them with: pip install \"vidurai[ai]\"")
 
         client = OpenAI(api_key=self.api_key)
 
@@ -101,8 +80,8 @@ Semantic gist (one sentence, <15 words):"""
                 {"role": "system", "content": "You are a semantic compression expert. Extract only the essential meaning."},
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=50,  # Gist should be very short
-            temperature=0.3  # Low temperature for consistency
+            max_tokens=50,
+            temperature=0.3
         )
 
         return response.choices[0].message.content

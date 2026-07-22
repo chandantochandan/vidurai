@@ -1,57 +1,15 @@
-# Core AI Frameworks
-langchain>=0.1.0
-llama-index>=0.9.0
-
-# NLP & Embeddings
-sentence-transformers>=2.2.0
-nltk>=3.8
-spacy>=3.7.0
-
-# Vector Search & Storage
-faiss-cpu>=1.7.4
-sqlite-vec>=0.1.0
-
-# Development Tools
-black>=23.0.0
-ruff>=0.1.0
-pytest>=7.4.0
-pytest-cov>=4.1.0
-
-# API & SDK
-fastapi>=0.104.0
-pydantic>=2.0.0
-uvicorn>=0.24.0
-
-# File Watching
-watchdog>=3.0.0
-
-# Git Operations
-gitpython>=3.1.0
-
-# Configuration Parsing
-toml>=0.10.2
-
-# Utilities
-numpy>=1.24.0
-tqdm>=4.66.0
-python-dotenv>=1.0.0
-loguru>=0.7.0
-psutil>=5.9.0
-
-# Storage & Archival (v2.1 Guardian)
-pyarrow>=14.0.0
-pandas>=2.0.0
-duckdb>=0.9.0
-
-# Explicit AI Clients
-openai>=1.0.0
-tiktoken>=0.5.0
-
-# Ingestion & "Ghost in the Shell"
-faiss-cpu>=1.7.4
-beautifulsoup4>=4.12.0
-ijson>=3.2.0
-
-# Interactive REPL (Sprint 3: The Interaction Layer)
-prompt_toolkit>=3.0.0
-Pygments>=2.15.0
+# DEPRECATED: Vidurai is now a modern Python package using pyproject.toml
+#
+# A legacy full-feature/all-optional-runtime installation for backward-compatible development workflows.
+#
+# Normal users should install the lightweight core package with:
+#    pip install vidurai
+#
+# Or, if installing from source, the core package without AI dependencies:
+#    pip install -e .
+#
+# Contributors setting up a development environment should refer to:
+#    pip install -e ".[dev]" (and install extras as needed).
+#
+# This file is retained for backward compatibility with old scripts.
+-e .[all]

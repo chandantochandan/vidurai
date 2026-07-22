@@ -1,0 +1,87 @@
+name: Python Packaging
+
+on:
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+        
+    - name: Install build dependencies
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install build twine pytest click
+        
+    - name: Build package
+      run: python -m build
+      
+    - name: Check package metadata
+      run: python -m twine check dist/*
+      
+    - name: Clean environment for isolated wheel install
+      run: |
+        python -m venv /tmp/isolated_env
+        
+    - name: Install isolated wheel
+      run: |
+        /tmp/isolated_env/bin/python -m pip install dist/vidurai-*.whl
+        
+    - name: Check pip constraints
+      run: |
+        /tmp/isolated_env/bin/python -m pip check
+        
+    - name: Verify heavy dependencies are absent
+      run: |
+        /tmp/isolated_env/bin/python -m pip freeze > frozen.txt
+        for pkg in torch transformers openai sentence-transformers llama-index langchain pandas duckdb faiss-cpu ijson; do
+          if grep -i "^$pkg==" frozen.txt; then
+            echo "FAILED: Heavy dependency $pkg leaked into core install!"
+            exit 1
+          fi
+        done
+        echo "Base install footprint is clean."
+        
+    - name: Test core imports without extras
+      run: |
+        /tmp/isolated_env/bin/python -c "import vidurai"
+        /tmp/isolated_env/bin/python -c "import vidurai.cli"
+        /tmp/isolated_env/bin/python -c "import vidurai.storage.database"
+        /tmp/isolated_env/bin/python -c "import vidurai.daemon.server"
+        /tmp/isolated_env/bin/python -c "import vidurai.mcp_server"
+        
+    - name: Test CLI help
+      run: |
+        /tmp/isolated_env/bin/vidurai --help
+        
+    - name: Test ingestion missing extra behaviour
+      run: |
+        touch fake.json
+        if /tmp/isolated_env/bin/vidurai ingest fake.json 2>&1 | grep -q "requires optional ingestion dependencies"; then
+          echo "Ingestion missing-extra check passed."
+        else
+          echo "Ingestion check failed."
+          exit 1
+        fi
+        
+    - name: Test Daemon Lifecycle
+      run: |
+        /tmp/isolated_env/bin/vidurai start
+        sleep 2
+        /tmp/isolated_env/bin/vidurai status
+        /tmp/isolated_env/bin/vidurai stop
+        
+    - name: Run WP-00 Integration Test
+      run: |
+        /tmp/isolated_env/bin/python -m pip install pytest requests
+        cd /tmp
+        /tmp/isolated_env/bin/python -m pytest $GITHUB_WORKSPACE/tests/integration/test_baseline_journey.py -v
