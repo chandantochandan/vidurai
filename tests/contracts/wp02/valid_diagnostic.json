@@ -1,0 +1,10 @@
+{
+  "id": "33333333-3333-3333-3333-333333333333",
+  "v": "2.0",
+  "type": "diagnostic",
+  "ts": 1700000002000,
+  "data": {
+    "level": "error",
+    "message": "Out of memory"
+  }
+}

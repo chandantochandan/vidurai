@@ -1,0 +1,13 @@
+{
+  "v": 1,
+  "type": "terminal",
+  "id": "123e4567-e89b-12d3-a456-426614174001",
+  "ts": 1000000000,
+  "data": {
+    "project_path": "/test",
+    "command": "ls -la",
+    "output": "file.txt",
+    "exit_code": 0,
+    "cwd": "/test"
+  }
+}

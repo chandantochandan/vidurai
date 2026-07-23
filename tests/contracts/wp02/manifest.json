@@ -1,0 +1,262 @@
+{
+  "valid_file_edit.json": {
+    "fixture_name": "valid_file_edit",
+    "message_class": "persisted_evidence",
+    "expected_validation_result": "pass",
+    "expected_ack_error_code": "recorded",
+    "retryable": false,
+    "receipt_expected": true,
+    "memory_expected": true,
+    "canonical_hash": "826db9ba33c66b79997e2871c38177ceae448a9ec935aa3e409e9bc44408049b"
+  },
+  "valid_terminal.json": {
+    "fixture_name": "valid_terminal",
+    "message_class": "persisted_evidence",
+    "expected_validation_result": "pass",
+    "expected_ack_error_code": "recorded",
+    "retryable": false,
+    "receipt_expected": true,
+    "memory_expected": true,
+    "canonical_hash": "ab5a71f83e3851547cc2611fb10f6fc4643252192a172026900f9dca96a4fee4"
+  },
+  "valid_severe_diagnostic.json": {
+    "fixture_name": "valid_severe_diagnostic",
+    "message_class": "persisted_evidence",
+    "expected_validation_result": "pass",
+    "expected_ack_error_code": "recorded",
+    "retryable": false,
+    "receipt_expected": true,
+    "memory_expected": true,
+    "canonical_hash": "e663beb033cdf28628b20c73869a4a2b315e980aa4c63f8211ab9a64658b7977"
+  },
+  "non_severe_diagnostic.json": {
+    "fixture_name": "non_severe_diagnostic",
+    "message_class": "persisted_evidence",
+    "expected_validation_result": "pass",
+    "expected_ack_error_code": "recorded",
+    "retryable": false,
+    "receipt_expected": true,
+    "memory_expected": false,
+    "canonical_hash": "212c575336186e7c3a8e3c49c40e2f0e9a0142d8c48e1e1b5b604f4ad72d238d"
+  },
+  "valid_control_request.json": {
+    "fixture_name": "valid_control_request",
+    "message_class": "control_rpc",
+    "expected_validation_result": "pass",
+    "expected_ack_error_code": null,
+    "retryable": false,
+    "receipt_expected": false,
+    "memory_expected": false,
+    "canonical_hash": "f441bf7dac9b57760343064b0e527ff326d4e90d868e2d3298eb295aeab5baba"
+  },
+  "valid_lifecycle_message.json": {
+    "fixture_name": "valid_lifecycle_message",
+    "message_class": "lifecycle",
+    "expected_validation_result": "pass",
+    "expected_ack_error_code": null,
+    "retryable": false,
+    "receipt_expected": false,
+    "memory_expected": false,
+    "canonical_hash": "907f6280743be504fa71fb95efc6455b52b773e739aa2428f4aef07a50d4bbed"
+  },
+  "duplicate_same_id_same_payload.json": {
+    "fixture_name": "duplicate_same_id_same_payload",
+    "message_class": "persisted_evidence",
+    "expected_validation_result": "pass",
+    "expected_ack_error_code": "duplicate",
+    "retryable": false,
+    "receipt_expected": true,
+    "memory_expected": true,
+    "canonical_hash": "826db9ba33c66b79997e2871c38177ceae448a9ec935aa3e409e9bc44408049b"
+  },
+  "conflict_same_id_different_payload.json": {
+    "fixture_name": "conflict_same_id_different_payload",
+    "message_class": "persisted_evidence",
+    "expected_validation_result": "fail",
+    "expected_ack_error_code": "event_id_payload_conflict",
+    "retryable": false,
+    "receipt_expected": false,
+    "memory_expected": false,
+    "canonical_hash": "3f56a361dc214847610727ec3d8b50316fca5dd3b738f48cee502a46ad253429"
+  },
+  "different_ids_same_payload.json": {
+    "fixture_name": "different_ids_same_payload",
+    "message_class": "persisted_evidence",
+    "expected_validation_result": "pass",
+    "expected_ack_error_code": "recorded",
+    "retryable": false,
+    "receipt_expected": true,
+    "memory_expected": true,
+    "canonical_hash": "826db9ba33c66b79997e2871c38177ceae448a9ec935aa3e409e9bc44408049b"
+  },
+  "legacy_missing_id.json": {
+    "fixture_name": "legacy_missing_id",
+    "message_class": "persisted_evidence",
+    "expected_validation_result": "pass",
+    "expected_ack_error_code": "legacy_unkeyed",
+    "retryable": false,
+    "receipt_expected": true,
+    "memory_expected": true,
+    "canonical_hash": "c3a9433724c535b737efe336e4c5f50bdc27fce3b4691d0474c05f639482045e"
+  },
+  "malformed_uuid.json": {
+    "fixture_name": "malformed_uuid",
+    "message_class": "persisted_evidence",
+    "expected_validation_result": "fail",
+    "expected_ack_error_code": "malformed_uuid",
+    "retryable": false,
+    "receipt_expected": false,
+    "memory_expected": false,
+    "canonical_hash": "c3a9433724c535b737efe336e4c5f50bdc27fce3b4691d0474c05f639482045e"
+  },
+  "missing_version.json": {
+    "fixture_name": "missing_version",
+    "message_class": "persisted_evidence",
+    "expected_validation_result": "fail",
+    "expected_ack_error_code": "missing_required_field",
+    "retryable": false,
+    "receipt_expected": false,
+    "memory_expected": false,
+    "canonical_hash": "9af57cf1c9e78d7c8f4aa55d87775ab5032349f424b0a05f365f8e2a1d3b667f"
+  },
+  "unsupported_version.json": {
+    "fixture_name": "unsupported_version",
+    "message_class": "persisted_evidence",
+    "expected_validation_result": "fail",
+    "expected_ack_error_code": "unsupported_version",
+    "retryable": false,
+    "receipt_expected": false,
+    "memory_expected": false,
+    "canonical_hash": "f163301a0311eaba5ca222fe74746bf46ff3640e67b5cea6db8570e5ab32bf6d"
+  },
+  "malformed_json.json": {
+    "fixture_name": "malformed_json",
+    "message_class": "invalid",
+    "expected_validation_result": "fail",
+    "expected_ack_error_code": "malformed_json",
+    "retryable": false,
+    "receipt_expected": false,
+    "memory_expected": false,
+    "canonical_hash": null
+  },
+  "truncated_ndjson.json": {
+    "fixture_name": "truncated_ndjson",
+    "message_class": "invalid",
+    "expected_validation_result": "fail",
+    "expected_ack_error_code": null,
+    "retryable": true,
+    "receipt_expected": false,
+    "memory_expected": false,
+    "canonical_hash": null
+  },
+  "missing_required_field.json": {
+    "fixture_name": "missing_required_field",
+    "message_class": "persisted_evidence",
+    "expected_validation_result": "fail",
+    "expected_ack_error_code": "missing_required_field",
+    "retryable": false,
+    "receipt_expected": false,
+    "memory_expected": false,
+    "canonical_hash": "ba8c796039bd615698b4a351bb72f85c5b2d7cd56c48462f9adf6e5a8d7c9c1d"
+  },
+  "unknown_event_type.json": {
+    "fixture_name": "unknown_event_type",
+    "message_class": "invalid",
+    "expected_validation_result": "fail",
+    "expected_ack_error_code": "unknown_event_type",
+    "retryable": false,
+    "receipt_expected": false,
+    "memory_expected": false,
+    "canonical_hash": "2584984230244c9e4a6cdaf8a445f5be0dd8326f39e22eb0b10c025fa985d7bb"
+  },
+  "unknown_extra_field.json": {
+    "fixture_name": "unknown_extra_field",
+    "message_class": "persisted_evidence",
+    "expected_validation_result": "pass",
+    "expected_ack_error_code": "recorded",
+    "retryable": false,
+    "receipt_expected": true,
+    "memory_expected": true,
+    "canonical_hash": "8df2667ac5c99cefc02190bd0df7057a0d4d446368f7e5d855cf308aa5c6862a"
+  },
+  "duplicate_recorded_state.json": {
+    "fixture_name": "duplicate_recorded_state",
+    "message_class": "persisted_evidence",
+    "expected_validation_result": "pass",
+    "expected_ack_error_code": "duplicate",
+    "retryable": false,
+    "receipt_expected": true,
+    "memory_expected": true,
+    "canonical_hash": "c3a9433724c535b737efe336e4c5f50bdc27fce3b4691d0474c05f639482045e"
+  },
+  "duplicate_processing_state.json": {
+    "fixture_name": "duplicate_processing_state",
+    "message_class": "persisted_evidence",
+    "expected_validation_result": "pass",
+    "expected_ack_error_code": "duplicate",
+    "retryable": false,
+    "receipt_expected": true,
+    "memory_expected": true,
+    "canonical_hash": "c3a9433724c535b737efe336e4c5f50bdc27fce3b4691d0474c05f639482045e"
+  },
+  "duplicate_processed_state.json": {
+    "fixture_name": "duplicate_processed_state",
+    "message_class": "persisted_evidence",
+    "expected_validation_result": "pass",
+    "expected_ack_error_code": "duplicate",
+    "retryable": false,
+    "receipt_expected": true,
+    "memory_expected": true,
+    "canonical_hash": "c3a9433724c535b737efe336e4c5f50bdc27fce3b4691d0474c05f639482045e"
+  },
+  "duplicate_failed_state.json": {
+    "fixture_name": "duplicate_failed_state",
+    "message_class": "persisted_evidence",
+    "expected_validation_result": "pass",
+    "expected_ack_error_code": "duplicate",
+    "retryable": false,
+    "receipt_expected": true,
+    "memory_expected": true,
+    "canonical_hash": "c3a9433724c535b737efe336e4c5f50bdc27fce3b4691d0474c05f639482045e"
+  },
+  "internal_watcher_evidence.json": {
+    "fixture_name": "internal_watcher_evidence",
+    "message_class": "persisted_evidence",
+    "expected_validation_result": "pass",
+    "expected_ack_error_code": "recorded",
+    "retryable": false,
+    "receipt_expected": true,
+    "memory_expected": true,
+    "canonical_hash": "1c31870d06c5246959d519f4d4b6950c34af0d5a8fb394fdba359e67bf64dbbb"
+  },
+  "retry_after_no_ack.json": {
+    "fixture_name": "retry_after_no_ack",
+    "message_class": "persisted_evidence",
+    "expected_validation_result": "pass",
+    "expected_ack_error_code": "duplicate",
+    "retryable": false,
+    "receipt_expected": true,
+    "memory_expected": true,
+    "canonical_hash": "c3a9433724c535b737efe336e4c5f50bdc27fce3b4691d0474c05f639482045e"
+  },
+  "retry_after_restart.json": {
+    "fixture_name": "retry_after_restart",
+    "message_class": "persisted_evidence",
+    "expected_validation_result": "pass",
+    "expected_ack_error_code": "duplicate",
+    "retryable": false,
+    "receipt_expected": true,
+    "memory_expected": true,
+    "canonical_hash": "c3a9433724c535b737efe336e4c5f50bdc27fce3b4691d0474c05f639482045e"
+  },
+  "concurrent_duplicate.json": {
+    "fixture_name": "concurrent_duplicate",
+    "message_class": "persisted_evidence",
+    "expected_validation_result": "pass",
+    "expected_ack_error_code": "duplicate",
+    "retryable": false,
+    "receipt_expected": true,
+    "memory_expected": true,
+    "canonical_hash": "c3a9433724c535b737efe336e4c5f50bdc27fce3b4691d0474c05f639482045e"
+  }
+}

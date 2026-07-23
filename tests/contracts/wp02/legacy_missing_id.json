@@ -1,0 +1,10 @@
+{
+  "v": 1,
+  "type": "file_edit",
+  "ts": 1000000000,
+  "data": {
+    "project_path": "/test",
+    "file": "/test/file.txt",
+    "change": "modify"
+  }
+}

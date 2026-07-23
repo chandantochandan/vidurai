@@ -1,0 +1,9 @@
+{
+  "v": 1,
+  "type": "handshake",
+  "id": "correlate-456",
+  "ts": 1000000000,
+  "data": {
+    "client": "vscode"
+  }
+}

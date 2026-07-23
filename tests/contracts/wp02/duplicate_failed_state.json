@@ -1,0 +1,11 @@
+{
+  "v": 1,
+  "type": "file_edit",
+  "id": "123e4567-e89b-12d3-a456-426614174103",
+  "ts": 1000000000,
+  "data": {
+    "project_path": "/test",
+    "file": "/test/file.txt",
+    "change": "modify"
+  }
+}

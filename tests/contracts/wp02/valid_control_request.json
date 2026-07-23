@@ -1,0 +1,10 @@
+{
+  "v": 1,
+  "type": "recall",
+  "id": "correlate-123",
+  "ts": 1000000000,
+  "data": {
+    "project_path": "/test",
+    "query": "hello"
+  }
+}

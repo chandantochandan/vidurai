@@ -1,0 +1,16 @@
+{
+  "v": 1,
+  "type": "diagnostic",
+  "id": "123e4567-e89b-12d3-a456-426614174003",
+  "ts": 1000000000,
+  "data": {
+    "project_path": "/test",
+    "file": "/test/file.txt",
+    "diagnostics": [
+      {
+        "message": "warning",
+        "severity": 2
+      }
+    ]
+  }
+}
