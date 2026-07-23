@@ -1,9 +1,11 @@
 {
-  "id": "66666666-6666-6666-6666-666666666666",
-  "v": "2.0",
+  "id": "66666666-6666-4666-a666-666666666666",
+  "v": 1,
   "type": "file_edit",
   "ts": 1700000006000,
   "data": {
-    "path": "/src/conflict.py"
+    "project_path": "/src",
+    "file": "/src/conflict.py",
+    "change": "modify"
   }
 }
