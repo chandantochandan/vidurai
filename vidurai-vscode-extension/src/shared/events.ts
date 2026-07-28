@@ -310,12 +310,18 @@ export interface MemoryEventPayload {
  */
 export const VIDURAI_SCHEMA_VERSION = 'vidurai-events-v1';
 
+import { randomUUID } from "crypto";
+
 /**
  * Generate a UUID for event_id
  * Uses a simple UUID v4 implementation that works in both Node.js and browsers
  */
 export function generateEventId(): string {
-  // Simple UUID v4 implementation that works everywhere
+  // Use standard runtime facility for strict UUIDv4
+  if (typeof randomUUID !== 'undefined') {
+    return randomUUID();
+  }
+  // Fallback for older environments
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
     const r = (Math.random() * 16) | 0;
     const v = c === 'x' ? r : (r & 0x3) | 0x8;
@@ -681,11 +687,19 @@ export function createIPCEvent<TData>(
   data?: TData,
   id?: string
 ): IPCEvent<TData> {
+  const class1Types = ['file_edit', 'terminal', 'diagnostic', 'terminal_command', 'diagnostics'];
+  
+  // WP-02: For Class 1 events only, generate UUIDv4 when the evidence is first created
+  let finalId = id;
+  if (!finalId && class1Types.includes(type)) {
+    finalId = generateEventId();
+  }
+  
   return {
     v: IPC_PROTOCOL_VERSION,
     type,
     ts: Date.now(),
-    id,
+    id: finalId,
     data,
   };
 }

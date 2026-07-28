@@ -143,9 +143,9 @@ class IPCMessage:
     @classmethod
     def from_json(cls, data: Dict[str, Any]) -> 'IPCMessage':
         return cls(
-            v=data.get('v', 1),
-            type=data.get('type', ''),
-            ts=data.get('ts', 0),
+            v=data.get('v'),
+            type=data.get('type'),
+            ts=data.get('ts'),
             id=data.get('id'),
             data=data.get('data')
         )
@@ -169,13 +169,13 @@ class IPCResponse:
             'ts': self.ts,
             'ok': self.ok,
         }
-        if self.id:
+        if self.id is not None:
             result['id'] = self.id
         if self.data is not None:
             result['data'] = self.data
-        if self.error:
+        if self.error is not None:
             result['error'] = self.error
-        return json.dumps(result)
+        return json.dumps(result, separators=(',', ':'))
 
 
 # =============================================================================
@@ -303,7 +303,8 @@ class IPCClientConnection:
                 error_response = IPCResponse(
                     type='error',
                     ok=False,
-                    error=f"Invalid JSON: {str(e)}"
+                    error="malformed_json",
+                    data={'retryable': False}
                 )
                 await self.send(error_response)
             except Exception as e:

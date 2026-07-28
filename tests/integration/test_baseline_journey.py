@@ -140,7 +140,6 @@ class TestBaselineJourney:
                 "v": 1,
                 "type": "file_edit",
                 "ts": int(time.time()*1000),
-                "id": "evt1",
                 "data": {
                     "project_path": self.project_dir,
                     "file": self.test_file,

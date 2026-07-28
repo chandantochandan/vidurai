@@ -200,19 +200,71 @@ class MemoryDatabase:
                     # Shutdown signal
                     break
 
-                query, params, future = task
+                query_data, params_data, future = task
 
                 try:
                     # Execute write within transaction
                     with conn:
-                        cursor = conn.execute(query, params)
-                        # Determine result type based on query
-                        if 'INSERT' in query.upper():
-                            result = cursor.lastrowid
-                        elif 'DELETE' in query.upper() or 'UPDATE' in query.upper():
-                            result = cursor.rowcount
+                        if isinstance(query_data, list):
+                            # It's a transaction block: list of (query, params)
+                            for q, p in query_data:
+                                cursor = conn.execute(q, p)
+                            result = True # Batch transaction success
+                        elif isinstance(query_data, tuple) and query_data[0] == "MEMORY_TX":
+                            _, mem_query, mem_params, receipt_id, processed_at = query_data
+                            # 1. Insert memory
+                            cursor = conn.execute(mem_query, mem_params)
+                            memory_id = cursor.lastrowid
+                            
+                            # 2. Insert FTS
+                            fts_params = params_data + (memory_id,)
+                            conn.execute("""
+                                INSERT INTO memories_fts (gist, verbatim, tags, memory_id)
+                                VALUES (?, ?, ?, ?)
+                            """, fts_params)
+                            
+                            # 3. Update Receipt
+                            conn.execute("""
+                                UPDATE event_receipts 
+                                SET status = 'processed', memory_id = ?, processed_at = ?
+                                WHERE receipt_id = ?
+                            """, (memory_id, processed_at, receipt_id))
+                            
+                            result = memory_id
+                        elif isinstance(query_data, tuple) and query_data[0] == "CLAIM_RECEIPTS":
+                            _, limit = query_data
+                            now = int(time.time() * 1000)
+                            # Find recorded receipts
+                            cursor = conn.execute("""
+                                SELECT receipt_id, attempt_count FROM event_receipts
+                                WHERE status = 'recorded'
+                                ORDER BY received_at ASC
+                                LIMIT ?
+                            """, (limit,))
+                            rows = cursor.fetchall()
+                            claimed = []
+                            for row in rows:
+                                receipt_id = row['receipt_id']
+                                attempt = row['attempt_count'] + 1
+                                conn.execute("""
+                                    UPDATE event_receipts
+                                    SET status = 'processing', attempt_count = ?, last_attempt_at = ?
+                                    WHERE receipt_id = ?
+                                """, (attempt, now, receipt_id))
+                                
+                                # fetch the full row to return
+                                cur = conn.execute("SELECT * FROM event_receipts WHERE receipt_id = ?", (receipt_id,))
+                                claimed.append(dict(cur.fetchone()))
+                            result = claimed
                         else:
-                            result = True
+                            cursor = conn.execute(query_data, params_data)
+                            # Determine result type based on query
+                            if 'INSERT' in query_data.upper():
+                                result = cursor.lastrowid
+                            elif 'DELETE' in query_data.upper() or 'UPDATE' in query_data.upper():
+                                result = cursor.rowcount
+                            else:
+                                result = True
 
                     # Pass result back to the caller
                     if future:
@@ -249,6 +301,20 @@ class MemoryDatabase:
         """
         future = SimpleFuture()
         self.write_queue.put((query, params, future))
+        return future
+
+    def _enqueue_transaction(self, queries: List[Tuple[str, tuple]]) -> SimpleFuture:
+        """
+        Helper to push a batch of queries to run in a single transaction.
+
+        Args:
+            queries: List of (query, params) tuples.
+
+        Returns:
+            SimpleFuture that will resolve to True if successful.
+        """
+        future = SimpleFuture()
+        self.write_queue.put((queries, None, future))
         return future
 
     # =========================================================================
@@ -418,6 +484,36 @@ class MemoryDatabase:
             ON audience_gists(audience)
         """)
 
+        # WP-02: Event Receipts table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS event_receipts (
+                receipt_id TEXT PRIMARY KEY NOT NULL,
+                event_id TEXT,
+                event_type TEXT NOT NULL,
+                payload_hash TEXT NOT NULL,
+                payload_json TEXT NOT NULL,
+                status TEXT NOT NULL
+                    CHECK (status IN ('recorded', 'processing', 'processed', 'failed')),
+                memory_id INTEGER,
+                received_at INTEGER NOT NULL,
+                processed_at INTEGER,
+                attempt_count INTEGER NOT NULL DEFAULT 0,
+                last_attempt_at INTEGER,
+                error_code TEXT
+            )
+        """)
+        
+        cursor.execute("""
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_event_receipts_event_id
+            ON event_receipts(event_id)
+            WHERE event_id IS NOT NULL
+        """)
+        
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_event_receipts_recovery
+            ON event_receipts(status, received_at)
+        """)
+
         conn.commit()
         conn.close()
 
@@ -458,6 +554,11 @@ class MemoryDatabase:
                 logger.info("Migrating schema to version 4 (v2.1 occurrence_count hotfix)")
                 self.add_column_if_missing('memories', 'occurrence_count', 'INTEGER DEFAULT 1')
                 current_version = 4
+
+            if current_version < 5:
+                logger.info("Migrating schema to version 5 (WP-02 event_receipts table)")
+                # event_receipts table already created additively in _init_schema_blocking
+                current_version = 5
 
             # Store current version (uses writer queue)
             future = self._enqueue(
@@ -624,6 +725,105 @@ class MemoryDatabase:
         except Exception as e:
             logger.error(f"Database error storing memory: {e}")
             raise
+
+    def process_memory_from_receipt(
+        self,
+        receipt_id: str,
+        project_path: str,
+        verbatim: str,
+        gist: str,
+        salience: SalienceLevel,
+        event_type: str,
+        file_path: Optional[str] = None,
+        line_number: Optional[int] = None,
+        tags: Optional[List[str]] = None,
+        retention_days: Optional[int] = None,
+        created_at: Optional[datetime] = None
+    ) -> int:
+        """
+        WP-02 Atomic Transaction: Process a memory and link it to its receipt.
+        """
+        try:
+            project_id = self.get_or_create_project(project_path)
+
+            expires_at = None
+            if retention_days:
+                base_time = created_at if created_at else datetime.now()
+                expires_at = (base_time + timedelta(days=retention_days)).isoformat()
+
+            created_at_str = created_at.isoformat() if created_at else None
+
+            # First, we need the memory_id, so we can't easily batch this with _enqueue_transaction
+            # We use our specialized MEMORY_TX tuple
+
+            mem_query = """
+                INSERT INTO memories (
+                    project_id, verbatim, gist, salience, event_type,
+                    file_path, line_number, tags, expires_at, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """
+            
+            # The created_at field handles historical vs current, handled identically since created_at_str falls back to None in the schema which defaults to CURRENT_TIMESTAMP, but wait, SQLite doesn't default NULL to CURRENT_TIMESTAMP unless we omit the column. Let's build the query dynamically.
+            if created_at_str:
+                mem_query = """
+                    INSERT INTO memories (
+                        project_id, verbatim, gist, salience, event_type,
+                        file_path, line_number, tags, expires_at, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """
+                mem_params = (project_id, verbatim, gist, salience.name, event_type, file_path, line_number, json.dumps(tags) if tags else None, expires_at, created_at_str)
+            else:
+                mem_query = """
+                    INSERT INTO memories (
+                        project_id, verbatim, gist, salience, event_type,
+                        file_path, line_number, tags, expires_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """
+                mem_params = (project_id, verbatim, gist, salience.name, event_type, file_path, line_number, json.dumps(tags) if tags else None, expires_at)
+            
+            fts_params = (gist, verbatim, json.dumps(tags) if tags else None)
+            processed_at = int(time.time() * 1000)
+            
+            future = SimpleFuture()
+            self.write_queue.put((("MEMORY_TX", mem_query, mem_params, receipt_id, processed_at), fts_params, future))
+            memory_id = future.result()
+            
+            logger.debug(f"WP-02 Atomic Transaction: processed receipt {receipt_id} to memory {memory_id}")
+            return memory_id
+            
+        except Exception as e:
+            logger.error(f"Database error in process_memory_from_receipt: {e}")
+            raise
+
+    def handle_processing_failure(self, receipt_id: str, error_msg: str) -> None:
+        """Handle a processing failure by transitioning back to recorded or failed."""
+        conn = self.get_connection_for_reading()
+        try:
+            row = conn.execute("SELECT attempt_count FROM event_receipts WHERE receipt_id = ?", (receipt_id,)).fetchone()
+            if not row:
+                return
+            
+            attempt = row['attempt_count']
+            new_status = 'failed' if attempt >= 3 else 'recorded'
+            
+            # Map exception string to bounded error code
+            bounded_code = 'internal_processing_failure'
+            if 'fts' in error_msg.lower():
+                bounded_code = 'fts_transaction_failed'
+            elif 'memory' in error_msg.lower():
+                bounded_code = 'memory_processing_failed'
+                
+            if attempt >= 3:
+                bounded_code = 'processing_attempts_exhausted'
+            
+            future = self._enqueue("""
+                UPDATE event_receipts
+                SET status = ?, error_code = ?
+                WHERE receipt_id = ?
+            """, (new_status, bounded_code, receipt_id))
+            future.result()
+        finally:
+            conn.close()
 
     def store_audience_gists(
         self,
@@ -798,6 +998,86 @@ class MemoryDatabase:
         except Exception as e:
             logger.error(f"Error creating pinned placeholder: {e}")
             raise
+
+    # =========================================================================
+    # EVENT RECEIPTS (WP-02)
+    # =========================================================================
+
+    def insert_event_receipt(
+        self,
+        receipt_id: str,
+        event_type: str,
+        payload_hash: str,
+        payload_json: str,
+        status: str,
+        received_at: int,
+        event_id: Optional[str] = None
+    ) -> bool:
+        try:
+            future = self._enqueue("""
+                INSERT INTO event_receipts (
+                    receipt_id, event_id, event_type, payload_hash, 
+                    payload_json, status, received_at, attempt_count
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, 0)
+            """, (receipt_id, event_id, event_type, payload_hash, payload_json, status, received_at))
+            future.result()
+            return True
+        except Exception as e:
+            logger.error(f"Error inserting event receipt: {e}")
+            return False
+
+    def get_receipt_by_event_id(self, event_id: str) -> Optional[dict]:
+        conn = self.get_connection_for_reading()
+        try:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM event_receipts WHERE event_id = ?", (event_id,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+        finally:
+            conn.close()
+            
+    def get_receipt_by_receipt_id(self, receipt_id: str) -> Optional[dict]:
+        conn = self.get_connection_for_reading()
+        try:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM event_receipts WHERE receipt_id = ?", (receipt_id,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+        finally:
+            conn.close()
+            
+    def update_receipt_status(self, receipt_id: str, status: str, error_code: Optional[str] = None) -> bool:
+        try:
+            future = self._enqueue("""
+                UPDATE event_receipts 
+                SET status = ?, error_code = ?
+                WHERE receipt_id = ?
+            """, (status, error_code, receipt_id))
+            future.result()
+            return True
+        except Exception as e:
+            logger.error(f"Error updating event receipt status: {e}")
+            return False
+            
+    def run_startup_recovery(self) -> None:
+        """
+        WP-02: Startup recovery transitions for interrupted processing.
+        """
+        future = self._enqueue_transaction([
+            # Transition attempt_count < 3 back to recorded
+            ("UPDATE event_receipts SET status = 'recorded' WHERE status = 'processing' AND attempt_count < 3", ()),
+            # Transition attempt_count >= 3 to failed
+            ("UPDATE event_receipts SET status = 'failed', error_code = 'startup_recovery_exhausted' WHERE status = 'processing' AND attempt_count >= 3", ())
+        ])
+        future.result()
+
+    def claim_recoverable_receipts(self, limit: int = 50) -> List[dict]:
+        """
+        Atomically transition recoverable receipts to 'processing' and return them.
+        """
+        future = SimpleFuture()
+        self.write_queue.put((("CLAIM_RECEIPTS", limit), None, future))
+        return future.result()
 
     def get_pinned_memories(self, project_id: int) -> List[Dict[str, Any]]:
         """

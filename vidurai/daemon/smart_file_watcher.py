@@ -288,13 +288,19 @@ class SmartFileWatcher(FileSystemEventHandler):
         """
         path = Path(filepath)
 
+        import uuid
         event_data = {
-            'event': 'file_changed',
-            'path': str(path),
-            'project': self.project_path,
-            'filename': path.name,
-            'timestamp': time.time(),
-            'context': context,
+            'id': str(uuid.uuid4()),
+            'v': 1,
+            'ts': int(time.time() * 1000),
+            'type': 'file_edit',
+            'data': {
+                'file': str(path),
+                'project_path': self.project_path,
+                'filename': path.name,
+                'change': 'modify',
+                'context': context,
+            }
         }
 
         # Add to queue for async broadcast

@@ -62,6 +62,9 @@ from vidurai.core.memory_pinning import MemoryPinManager
 # v2.3: Vismriti AI Memory Engine (SDK Integration)
 from vidurai.vismriti_memory import VismritiMemory
 from .intelligence.event_adapter import EventAdapter
+from .ipc.validation import validate_class1_evidence, generate_canonical_payload, generate_canonical_hash
+import uuid
+import time
 
 # v2.4: Cognitive Control API - RewardProfile for dynamic RL agent configuration
 try:
@@ -199,6 +202,142 @@ async def _remember_async(memory_args: Dict[str, Any]) -> None:
     except Exception as e:
         logger.error(f"[Vismriti] Remember failed: {e}")
 
+async def _process_receipt_async(receipt_id: str, memory_args: Dict[str, Any], event_type: str, msg_data: Dict[str, Any] = None) -> None:
+    """
+    WP-02: Asynchronous dispatch after receipt commit.
+    """
+    global memory_db
+    if not memory_db:
+        logger.warning(f"[WP-02] Dropping receipt {receipt_id} - no database")
+        return
+        
+    try:
+        # Instead of generic remember(), we use the atomic transaction if we have a memory_args
+        # Wait, if we use memory_db.process_memory_from_receipt, it goes straight to SQLite.
+        # It needs the parsed args from EventAdapter.
+        
+        # But wait, vismriti_brain does gist extraction!
+        # If extract_gist is true, we should do it first.
+        # But memory_args from Class 1 events usually have extract_gist=False.
+        
+        if memory_args:
+            metadata = memory_args.get('metadata', {})
+            # Execute atomic transaction
+            await asyncio.to_thread(
+                memory_db.process_memory_from_receipt,
+                receipt_id=receipt_id,
+                project_path=metadata.get('project_path') or metadata.get('project') or (msg_data.get('project_path') if msg_data else '') or (msg_data.get('project') if msg_data else '') or '',
+                verbatim=memory_args.get('content', ''),
+                gist=metadata.get('message', '') or metadata.get('gist', '') or memory_args.get('content', ''),
+                salience=memory_args.get('salience'),
+                event_type=event_type,
+                file_path=metadata.get('file'),
+                line_number=metadata.get('line') or metadata.get('lines'),
+                tags=[],
+                retention_days=None,
+                created_at=None
+            )
+            logger.info(f"[WP-02] Successfully processed receipt {receipt_id}")
+        else:
+            # If EventAdapter returned None (e.g. noise diagnostic), we just mark it processed
+            await asyncio.to_thread(
+                memory_db.update_receipt_status,
+                receipt_id=receipt_id,
+                status='processed'
+            )
+            
+    except Exception as e:
+        logger.error(f"[WP-02] Failed to process receipt {receipt_id}: {e}")
+        await asyncio.to_thread(memory_db.handle_processing_failure, receipt_id, str(e))
+
+
+async def _handle_class1_evidence(message: IPCMessage, msg_type: str, msg_data: Dict[str, Any]) -> IPCResponse:
+    """
+    WP-02: Handle Class 1 Validation, Normalization, Idempotency and Receipt generation.
+    Returns the IPCResponse to send back.
+    """
+    from vidurai.daemon.ipc.validation import validate_class1_evidence, generate_canonical_payload, normalize_aliases
+    
+    global memory_db
+    if not memory_db:
+        return IPCResponse(type='error', id=message.id, ok=False, error="Database not available")
+        
+    # 1. Normalise Aliases
+    norm_type, norm_data = normalize_aliases(msg_type, msg_data)
+        
+    # 2. Validation
+    is_valid, err_code, err_msg = validate_class1_evidence(message.v, norm_type, message.ts, message.id, norm_data)
+    if not is_valid:
+        return IPCResponse(
+            type='error',
+            id=message.id,
+            ok=False,
+            error=err_code,
+            data={'retryable': False}
+        )
+        
+    # 3. Canonical JSON and Hash
+    ts = message.ts or int(time.time() * 1000)
+    canon_json = generate_canonical_payload(message.v, norm_type, ts, norm_data)
+    payload_hash = generate_canonical_hash(canon_json)
+    
+    # 4. Idempotency Check
+    receipt_id = str(uuid.uuid4())
+    event_id = message.id
+    
+    if event_id:
+        existing = await asyncio.to_thread(memory_db.get_receipt_by_event_id, event_id)
+        if existing:
+            if existing['payload_hash'] == payload_hash:
+                return IPCResponse(
+                    type='ack',
+                    id=message.id,
+                    ok=True,
+                    data={'status': 'duplicate', 'receipt_id': existing['receipt_id']}
+                )
+            else:
+                return IPCResponse(
+                    type='error',
+                    id=message.id,
+                    ok=False,
+                    error="event_id_payload_conflict",
+                    data={'retryable': False}
+                )
+                
+    # 5. Durable Commit
+    success = await asyncio.to_thread(
+        memory_db.insert_event_receipt,
+        receipt_id=receipt_id,
+        event_type=norm_type,
+        payload_hash=payload_hash,
+        payload_json=canon_json,
+        status='recorded',
+        received_at=int(time.time() * 1000),
+        event_id=event_id
+    )
+    
+    if not success:
+        return IPCResponse(
+            type='error',
+            id=message.id,
+            ok=False,
+            error="internal_durable_write_failure",
+            data={'retryable': True}
+        )
+        
+    # 6. Background Dispatch
+    memory_args = EventAdapter.adapt(norm_data, norm_type)
+    asyncio.create_task(_process_receipt_async(receipt_id, memory_args, norm_type, msg_data))
+    
+    status_msg = 'recorded' if event_id else 'legacy_unkeyed'
+    # 6. ACK Boundary
+    return IPCResponse(
+        type='ack',
+        id=message.id,
+        ok=True,
+        data={'status': status_msg, 'receipt_id': receipt_id}
+    )
+
 
 async def handle_ipc_message(client, message: IPCMessage) -> IPCResponse:
     """
@@ -291,19 +430,15 @@ async def handle_ipc_message(client, message: IPCMessage) -> IPCResponse:
             # Broadcast to WebSocket clients
             await broadcast_event(event)
 
-            # v2.3: Send to Vismriti AI Memory Engine (Async Firewall)
-            memory_args = EventAdapter.adapt(msg_data, 'file_edit')
-            if memory_args:
-                asyncio.create_task(_remember_async(memory_args))
-
-            return IPCResponse(type='ack', id=message.id, ok=True)
+            # WP-02 Class 1 Flow
+            return await _handle_class1_evidence(message, msg_type, msg_data)
 
         # Terminal events from extension
-        elif msg_type == 'terminal':
-            cmd = msg_data.get('cmd', '')
-            code = msg_data.get('code')
-            output = msg_data.get('out', '')
-            error_output = msg_data.get('err', '')
+        elif msg_type in ('terminal', 'terminal_command'):
+            cmd = msg_data.get('cmd', '') or msg_data.get('command', '')
+            code = msg_data.get('code') or msg_data.get('exit_code')
+            output = msg_data.get('out', '') or msg_data.get('output', '')
+            error_output = msg_data.get('err', '') or msg_data.get('error', '')
 
             # Add to context mediator
             event = {
@@ -325,18 +460,21 @@ async def handle_ipc_message(client, message: IPCMessage) -> IPCResponse:
                 except Exception as e:
                     logger.error(f"Failed to capture terminal error: {e}")
 
-            # v2.3: Send to Vismriti AI Memory Engine (Async Firewall)
-            memory_args = EventAdapter.adapt(msg_data, 'terminal')
-            if memory_args:
-                asyncio.create_task(_remember_async(memory_args))
-
-            return IPCResponse(type='ack', id=message.id, ok=True)
+            # WP-02 Class 1 Flow
+            return await _handle_class1_evidence(message, msg_type, msg_data)
 
         # Diagnostic events from extension
-        elif msg_type == 'diagnostic':
+        elif msg_type in ('diagnostic', 'diagnostics'):
             file_path = msg_data.get('file', '')
-            severity = msg_data.get('sev', 0)
+            severity = msg_data.get('sev')
+            if severity is None and 'diagnostics' in msg_data and isinstance(msg_data['diagnostics'], list) and len(msg_data['diagnostics']) > 0:
+                severity = msg_data['diagnostics'][0].get('severity', 0)
+            if severity is None: severity = 0
+            
             msg_text = msg_data.get('msg', '')
+            if not msg_text and 'diagnostics' in msg_data and isinstance(msg_data['diagnostics'], list) and len(msg_data['diagnostics']) > 0:
+                msg_text = msg_data['diagnostics'][0].get('message', '')
+                
             line = msg_data.get('ln')
 
             severity_map = {0: 'error', 1: 'warning', 2: 'info', 3: 'hint'}
@@ -361,7 +499,7 @@ async def handle_ipc_message(client, message: IPCMessage) -> IPCResponse:
                         warning_count = 1 if severity == 1 else 0
                         memory_db.upsert_file_state(
                             file_path=file_path,
-                            project_path=msg_data.get('project', ''),
+                            project_path=msg_data.get('project', '') or msg_data.get('project_path', ''),
                             has_errors=(severity == 0),
                             error_count=error_count,
                             warning_count=warning_count,
@@ -372,13 +510,18 @@ async def handle_ipc_message(client, message: IPCMessage) -> IPCResponse:
                 except Exception as e:
                     logger.debug(f"Active state update error (non-fatal): {e}")
 
-            # v2.3: Send to Vismriti AI Memory Engine (Async Firewall)
-            # Note: EventAdapter returns None for info/hint (Zombie Killer compliance)
-            memory_args = EventAdapter.adapt(msg_data, 'diagnostic')
-            if memory_args:
-                asyncio.create_task(_remember_async(memory_args))
-
-            return IPCResponse(type='ack', id=message.id, ok=True)
+            # WP-02 Class 1 Flow
+            # Severe diagnostics (0, 1) are Class 1 evidence.
+            # Non-severe diagnostics (2, 3) must bypass durable receipt generation.
+            if severity in (0, 1):
+                return await _handle_class1_evidence(message, msg_type, msg_data)
+            else:
+                return IPCResponse(
+                    type='ack',
+                    id=message.id,
+                    ok=True,
+                    data={'status': 'recorded'}
+                )
 
         # Context request from extension
         elif msg_type == 'context':
@@ -997,7 +1140,7 @@ async def handle_ipc_message(client, message: IPCMessage) -> IPCResponse:
                 type='error',
                 id=message.id,
                 ok=False,
-                error=f"Unknown message type: {msg_type}"
+                error="unknown_event_type"
             )
 
     except Exception as e:
@@ -1098,6 +1241,21 @@ async def process_event_queue():
 
                 # Broadcast to WebSocket clients
                 await broadcast_event(event)
+                
+                # WP-02: Enter the same receipt-registration and processing pathway as IPC evidence
+                from ipc.server import IPCMessage
+                msg_type = event.get('type')
+                if msg_type in ('file_edit', 'terminal', 'diagnostic', 'terminal_command', 'diagnostics'):
+                    # Create dummy IPC message
+                    ipc_msg = IPCMessage(
+                        v=event.get('v', 1),
+                        type=msg_type,
+                        ts=event.get('ts', int(time.time() * 1000)),
+                        id=event.get('id'),
+                        data=event.get('data', {})
+                    )
+                    await _handle_class1_evidence(ipc_msg, msg_type, event.get('data', {}))
+
             await asyncio.sleep(0.1)  # Small delay to avoid busy loop
         except Exception as e:
             logger.error(f"Error processing event queue: {e}")
@@ -1223,6 +1381,40 @@ async def _background_initialization():
     try:
         memory_db = MemoryDatabase()
         logger.info("   ✓ MemoryDatabase initialized")
+        
+        # WP-02: Startup recovery
+        logger.info("   ⚙ Running WP-02 startup recovery...")
+        memory_db.run_startup_recovery()
+        recovered = memory_db.claim_recoverable_receipts(limit=50)
+        if recovered:
+            logger.info(f"   ⚙ Enqueuing {len(recovered)} recovered receipts")
+            for rec in recovered:
+                # We do not have the original memory_args (EventAdapter output) easily available, 
+                # but we can re-parse payload_json or just pass it as generic args.
+                try:
+                    payload = json.loads(rec['payload_json'])
+                    event_type = payload.get('type', rec['event_type'])
+                    msg_data = payload.get('data', {})
+                    # Need to parse salience/context etc.
+                    # As a shortcut, we can just let it re-process or construct generic args
+                    from intelligence.event_adapter import EventAdapter
+                    import logging
+                    dummy_logger = logging.getLogger("dummy")
+                    adapter = EventAdapter(dummy_logger, vismriti_brain)
+                    
+                    class DummyMsg:
+                        def __init__(self, typ, dat):
+                            self.type = typ
+                            self.data = dat
+                            self.id = rec['receipt_id']
+                            
+                    msg = DummyMsg(event_type, msg_data)
+                    memory_args = adapter.transform_event(msg)
+                    asyncio.create_task(_process_receipt_async(rec['receipt_id'], memory_args, event_type, msg_data))
+                except Exception as e:
+                    logger.error(f"Failed to enqueue recovered receipt {rec['receipt_id']}: {e}")
+                    memory_db.handle_processing_failure(rec['receipt_id'], str(e))
+        
     except Exception as e:
         logger.error(f"   ✗ MemoryDatabase failed: {e}")
         memory_db = None
@@ -1264,7 +1456,6 @@ async def _background_initialization():
     logger.info("")
 
     # v2.3: Initialize Vismriti AI Memory Engine
-    global vismriti_brain
     logger.info("🧠 Initializing Vismriti AI Memory Engine...")
     try:
         import os
