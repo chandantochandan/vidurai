@@ -27,6 +27,15 @@
 
 ---
 
+## Planned for v2.6.0 (Candidate — pending founder approval)
+
+### Project Drag Detection
+* Detect and explain when AI agents appear to be unnecessarily extending a project.
+* Depends on: stable agent and project identity, agent work ledger, task ownership, approval history, test/result evidence, context and handoff records.
+* Position: After WP-03 identity foundations and alongside or before the agent ledger / Memory Inspector capabilities.
+
+---
+
 ## Planned for v3.0.0
 
 * Multi-project workspaces
