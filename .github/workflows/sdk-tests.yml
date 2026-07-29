@@ -5,6 +5,7 @@ on:
     paths:
       - "vidurai/**"
       - "tests/**"
+      - ".github/workflows/sdk-tests.yml"
   pull_request:
 
 jobs:
