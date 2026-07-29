@@ -58,8 +58,10 @@ class TestContext:
             except:
                 pass
 
-@pytest.mark.asyncio
-async def test_non_severe_diagnostic():
+def test_non_severe_diagnostic():
+    asyncio.run(_check_test_non_severe_diagnostic())
+
+async def _check_test_non_severe_diagnostic():
     ctx = TestContext()
     # Severity 2
     msg = IPCMessage.from_json({"v": 1, "type": "diagnostic", "ts": 123, "id": str(uuid.uuid4()), "data": {"sev": 2, "msg": "test", "file": "a.py"}})
@@ -78,8 +80,10 @@ async def test_non_severe_diagnostic():
     assert r == 1
     ctx.cleanup()
 
-@pytest.mark.asyncio
-async def test_class2_class3_exclusion():
+def test_class2_class3_exclusion():
+    asyncio.run(_check_test_class2_class3_exclusion())
+
+async def _check_test_class2_class3_exclusion():
     ctx = TestContext()
     msgs = [
         IPCMessage.from_json({"v": 1, "type": "recall", "ts": 123, "data": {"query": "test"}}),
@@ -93,8 +97,10 @@ async def test_class2_class3_exclusion():
     assert f == 0
     ctx.cleanup()
 
-@pytest.mark.asyncio
-async def test_alias_canonical_equivalence():
+def test_alias_canonical_equivalence():
+    asyncio.run(_check_test_alias_canonical_equivalence())
+
+async def _check_test_alias_canonical_equivalence():
     ctx = TestContext()
     event_id = str(uuid.uuid4())
     
@@ -114,8 +120,10 @@ async def test_alias_canonical_equivalence():
     assert res2.data.get('status') == 'duplicate'
     ctx.cleanup()
 
-@pytest.mark.asyncio
-async def test_real_unique_index_behaviour():
+def test_real_unique_index_behaviour():
+    asyncio.run(_check_test_real_unique_index_behaviour())
+
+async def _check_test_real_unique_index_behaviour():
     ctx = TestContext()
     event_id = str(uuid.uuid4())
     
@@ -163,8 +171,10 @@ def test_atomic_rollback():
     assert status == 'recorded'
     ctx.cleanup()
 
-@pytest.mark.asyncio
-async def test_live_server_route():
+def test_live_server_route():
+    asyncio.run(_check_test_live_server_route())
+
+async def _check_test_live_server_route():
     ctx = TestContext()
     msg = IPCMessage.from_json({"v": 1, "type": "file_edit", "ts": 123, "id": str(uuid.uuid4()), "data": {"project_path": "/a", "file": "b", "change": "c"}})
     res = await handle_ipc_message(MagicMock(), msg)
@@ -172,8 +182,10 @@ async def test_live_server_route():
     assert ctx.get_counts()[0] == 1
     ctx.cleanup()
     
-@pytest.mark.asyncio
-async def test_durable_failure():
+def test_durable_failure():
+    asyncio.run(_check_test_durable_failure())
+
+async def _check_test_durable_failure():
     ctx = TestContext()
     ctx.db.insert_event_receipt = MagicMock(return_value=False)
     
@@ -188,17 +200,19 @@ async def test_durable_failure():
 
 if __name__ == "__main__":
     print("Running WP-02 Permanent Tests...")
-    asyncio.run(test_non_severe_diagnostic())
-    asyncio.run(test_class2_class3_exclusion())
-    asyncio.run(test_alias_canonical_equivalence())
-    asyncio.run(test_real_unique_index_behaviour())
+    test_non_severe_diagnostic()
+    test_class2_class3_exclusion()
+    test_alias_canonical_equivalence()
+    test_real_unique_index_behaviour()
     test_atomic_rollback()
-    asyncio.run(test_live_server_route())
-    asyncio.run(test_durable_failure())
+    test_live_server_route()
+    test_durable_failure()
     print("All permanent tests passed!")
 
-@pytest.mark.asyncio
-async def test_framing_compliance():
+def test_framing_compliance():
+    asyncio.run(_check_test_framing_compliance())
+
+async def _check_test_framing_compliance():
     from vidurai.daemon.ipc.server import IPCClientConnection, IPCResponse
     import asyncio
     
