@@ -437,6 +437,16 @@ class MemoryDatabase:
             )
         """)
 
+        # WP-03: Project aliases table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS project_aliases (
+                project_id INTEGER NOT NULL,
+                path TEXT UNIQUE NOT NULL,
+                last_active TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(project_id) REFERENCES projects(id)
+            )
+        """)
+
         # v2.1: Active State table for "Current Truth" projection (Zombie Killer)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS active_state (
@@ -560,6 +570,35 @@ class MemoryDatabase:
                 # event_receipts table already created additively in _init_schema_blocking
                 current_version = 5
 
+            if current_version < 6:
+                logger.info("Migrating schema to version 6 (WP-03 identity)")
+                self.add_column_if_missing('projects', 'project_uuid', 'TEXT')
+                self.add_column_if_missing('projects', 'remote_fingerprint', 'TEXT')
+                self.add_column_if_missing('event_receipts', 'project_uuid', 'TEXT')
+                self.add_column_if_missing('event_receipts', 'branch', 'TEXT')
+                self.add_column_if_missing('event_receipts', 'commit_hash', 'TEXT')
+                self.add_column_if_missing('event_receipts', 'detached_head', 'BOOLEAN')
+                
+                # WP-03: Create project_aliases table
+                future = self._enqueue("""
+                    CREATE TABLE IF NOT EXISTS project_aliases (
+                        project_id INTEGER NOT NULL,
+                        path TEXT UNIQUE NOT NULL,
+                        last_active TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY(project_id) REFERENCES projects(id)
+                    )
+                """, ())
+                future.result()
+                
+                # Migrate existing aliases
+                future = self._enqueue("""
+                    INSERT OR IGNORE INTO project_aliases (project_id, path, last_active)
+                    SELECT id, path, last_active FROM projects
+                """, ())
+                future.result()
+                
+                current_version = 6
+
             # Store current version (uses writer queue)
             future = self._enqueue(
                 "INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)",
@@ -576,24 +615,72 @@ class MemoryDatabase:
     # PROJECT MANAGEMENT
     # =========================================================================
 
-    def get_or_create_project(self, project_path: str) -> int:
+    def get_or_create_project(self, project_path: str, identity: Optional[Dict] = None) -> int:
         """
         Get project ID, creating if needed.
 
-        Uses both read (to check) and write (to create/update).
+        Args:
+            project_path: Workspace path alias
+            identity: Optional resolved identity dict (from vidurai.identity). 
         """
         conn = self.get_connection_for_reading()
         try:
             cursor = conn.cursor()
+            
+            # If identity provided, lookup by UUID first
+            if identity and not identity.get('ambiguous'):
+                uuid_str = identity.get('project_uuid')
+                if uuid_str:
+                    cursor.execute(
+                        "SELECT id FROM projects WHERE project_uuid = ?",
+                        (uuid_str,)
+                    )
+                    result = cursor.fetchone()
+                    if result:
+                        project_id = result['id']
+                        # Update last_active on project and ensure alias exists
+                        future = self._enqueue("""
+                            UPDATE projects SET last_active = CURRENT_TIMESTAMP WHERE id = ?;
+                        """, (project_id,))
+                        future.result()
+                        future = self._enqueue("""
+                            INSERT INTO project_aliases (project_id, path, last_active)
+                            VALUES (?, ?, CURRENT_TIMESTAMP)
+                            ON CONFLICT(path) DO UPDATE SET project_id=excluded.project_id, last_active=CURRENT_TIMESTAMP;
+                        """, (project_id, project_path))
+                        future.result()
+                        return project_id
+                        
+            # Fallback to path lookup via aliases
             cursor.execute(
-                "SELECT id FROM projects WHERE path = ?",
+                "SELECT project_id FROM project_aliases WHERE path = ?",
                 (project_path,)
             )
             result = cursor.fetchone()
+            if not result:
+                # Legacy fallback just in case alias not migrated
+                cursor.execute(
+                    "SELECT id FROM projects WHERE path = ?",
+                    (project_path,)
+                )
+                result = cursor.fetchone()
+                if result:
+                    result = {'project_id': result['id']}
 
             if result:
-                project_id = result['id']
-                # Update last_active via writer queue
+                project_id = result['project_id']
+                # If we found it by path but we have a UUID, backfill it
+                if identity and not identity.get('ambiguous'):
+                    uuid_str = identity.get('project_uuid')
+                    fp_str = identity.get('remote_fingerprint')
+                    if uuid_str:
+                        future = self._enqueue(
+                            "UPDATE projects SET last_active = CURRENT_TIMESTAMP, project_uuid = ?, remote_fingerprint = ? WHERE id = ?",
+                            (uuid_str, fp_str, project_id)
+                        )
+                        future.result()
+                        return project_id
+
                 future = self._enqueue(
                     "UPDATE projects SET last_active = CURRENT_TIMESTAMP WHERE id = ?",
                     (project_id,)
@@ -605,11 +692,33 @@ class MemoryDatabase:
 
         # Create new project via writer queue
         project_name = Path(project_path).name
+        if identity and not identity.get('ambiguous'):
+            uuid_str = identity.get('project_uuid')
+            fp_str = identity.get('remote_fingerprint')
+            if uuid_str:
+                future = self._enqueue(
+                    "INSERT INTO projects (path, name, project_uuid, remote_fingerprint) VALUES (?, ?, ?, ?)",
+                    (project_path, project_name, uuid_str, fp_str)
+                )
+                project_id = future.result()
+                future = self._enqueue(
+                    "INSERT INTO project_aliases (project_id, path, last_active) VALUES (?, ?, CURRENT_TIMESTAMP)",
+                    (project_id, project_path)
+                )
+                future.result()
+                logger.info(f"Created new project: {project_name} (ID: {project_id}, UUID: {uuid_str})")
+                return project_id
+
         future = self._enqueue(
             "INSERT INTO projects (path, name) VALUES (?, ?)",
             (project_path, project_name)
         )
         project_id = future.result()
+        future = self._enqueue(
+            "INSERT INTO project_aliases (project_id, path, last_active) VALUES (?, ?, CURRENT_TIMESTAMP)",
+            (project_id, project_path)
+        )
+        future.result()
         logger.info(f"Created new project: {project_name} (ID: {project_id})")
         return project_id
 
@@ -628,7 +737,8 @@ class MemoryDatabase:
         line_number: Optional[int] = None,
         tags: Optional[List[str]] = None,
         retention_days: Optional[int] = None,
-        created_at: Optional[datetime] = None  # Sprint 1.5: Historical timestamp support
+        created_at: Optional[datetime] = None,
+        identity: Optional[Dict] = None
     ) -> int:
         """
         Store new memory in database.
@@ -654,7 +764,7 @@ class MemoryDatabase:
             The ID of the newly created memory
         """
         try:
-            project_id = self.get_or_create_project(project_path)
+            project_id = self.get_or_create_project(project_path, identity=identity)
 
             # Calculate expiration
             expires_at = None
@@ -738,13 +848,14 @@ class MemoryDatabase:
         line_number: Optional[int] = None,
         tags: Optional[List[str]] = None,
         retention_days: Optional[int] = None,
-        created_at: Optional[datetime] = None
+        created_at: Optional[datetime] = None,
+        identity: Optional[Dict] = None
     ) -> int:
         """
         WP-02 Atomic Transaction: Process a memory and link it to its receipt.
         """
         try:
-            project_id = self.get_or_create_project(project_path)
+            project_id = self.get_or_create_project(project_path, identity=identity)
 
             expires_at = None
             if retention_days:
@@ -1011,15 +1122,23 @@ class MemoryDatabase:
         payload_json: str,
         status: str,
         received_at: int,
-        event_id: Optional[str] = None
+        event_id: Optional[str] = None,
+        identity: Optional[Dict] = None
     ) -> bool:
         try:
+            # Identity fields
+            project_uuid = identity.get("project_uuid") if identity else None
+            branch = identity.get("branch") if identity else None
+            commit_hash = identity.get("commit") if identity else None
+            detached_head = identity.get("detached") if identity else None
+
             future = self._enqueue("""
                 INSERT INTO event_receipts (
                     receipt_id, event_id, event_type, payload_hash, 
-                    payload_json, status, received_at, attempt_count
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, 0)
-            """, (receipt_id, event_id, event_type, payload_hash, payload_json, status, received_at))
+                    payload_json, status, received_at, attempt_count,
+                    project_uuid, branch, commit_hash, detached_head
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)
+            """, (receipt_id, event_id, event_type, payload_hash, payload_json, status, received_at, project_uuid, branch, commit_hash, detached_head))
             future.result()
             return True
         except Exception as e:

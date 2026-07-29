@@ -235,7 +235,8 @@ async def _process_receipt_async(receipt_id: str, memory_args: Dict[str, Any], e
                 line_number=metadata.get('line') or metadata.get('lines'),
                 tags=[],
                 retention_days=None,
-                created_at=None
+                created_at=None,
+                identity=msg_data.get('_identity') if msg_data else None
             )
             logger.info(f"[WP-02] Successfully processed receipt {receipt_id}")
         else:
@@ -276,6 +277,24 @@ async def _handle_class1_evidence(message: IPCMessage, msg_type: str, msg_data: 
             data={'retryable': False}
         )
         
+    # 2.5 WP-03: Project Identity Resolution
+    project_path = norm_data.get('project_path') or norm_data.get('project') or ''
+    from vidurai.daemon.identity import resolve_project_identity
+    identity = resolve_project_identity(project_path)
+    
+    if identity.get('ambiguous'):
+        # Quarantine ambiguous identity
+        return IPCResponse(
+            type='error',
+            id=message.id,
+            ok=False,
+            error="ambiguous_project_identity",
+            data={'retryable': False, 'reason': identity.get('error')}
+        )
+        
+    # Inject identity into norm_data so _process_receipt_async can use it for DB insertion
+    norm_data['_identity'] = identity
+
     # 3. Canonical JSON and Hash
     ts = message.ts or int(time.time() * 1000)
     canon_json = generate_canonical_payload(message.v, norm_type, ts, norm_data)
@@ -313,7 +332,8 @@ async def _handle_class1_evidence(message: IPCMessage, msg_type: str, msg_data: 
         payload_json=canon_json,
         status='recorded',
         received_at=int(time.time() * 1000),
-        event_id=event_id
+        event_id=event_id,
+        identity=identity
     )
     
     if not success:
@@ -1465,7 +1485,7 @@ async def _background_initialization():
             enable_rl_agent=True,           # Enable Q-learning agent
             enable_aggregation=True,
             retention_policy="rule_based",
-            project_path=os.getcwd()
+            project_path=''
         )
         logger.info("   ✓ Vismriti AI Engine activated")
         logger.info(f"   ✓ RL Agent: enabled, Decay: enabled")
@@ -1481,7 +1501,7 @@ async def _background_initialization():
     logger.info("🔗 Initializing StateLinker...")
     try:
         import os
-        state_linker = StateLinker(project_root=Path(os.getcwd()))
+        state_linker = StateLinker(project_root=Path(''))
         logger.info("   ✓ StateLinker ready (Reality Grounding enabled)")
     except Exception as e:
         logger.error(f"   ✗ StateLinker failed: {e}")

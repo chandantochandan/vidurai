@@ -6,7 +6,7 @@ import asyncio
 import os
 import sqlite3
 from pathlib import Path
-from unittest.mock import MagicMock, AsyncMock
+from unittest.mock import MagicMock, AsyncMock, patch
 
 # Removed broad sys.modules MagicMocks that break Python 3.12 typing evaluation.
 
@@ -19,6 +19,18 @@ from vidurai.storage.database import MemoryDatabase, SalienceLevel
 # -----------------------------------------------------------------------------
 # Real Isolated DB Testing
 # -----------------------------------------------------------------------------
+
+@pytest.fixture(autouse=True)
+def mock_identity_resolver():
+    with patch("vidurai.daemon.identity.resolve_project_identity") as mock_resolve:
+        mock_resolve.return_value = {
+            'ambiguous': False,
+            'project_uuid': 'test-uuid-1234',
+            'remote_fingerprint': 'test-fingerprint',
+            'branch': 'master',
+            'commit': 'test-commit'
+        }
+        yield mock_resolve
 
 class TestContext:
     def __init__(self):
