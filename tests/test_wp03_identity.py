@@ -150,3 +150,88 @@ def test_resolve_identity_quarantine_non_git():
         id_empty = resolve_project_identity(empty_dir)
         assert id_empty['ambiguous']
         assert 'Not a git repository' in id_empty['error']
+
+def test_resolve_identity_equivalent_urls():
+    with tempfile.TemporaryDirectory() as repo:
+        setup_git_repo(repo)
+        subprocess.run(["git", "remote", "add", "origin", "https://github.com/org/repo.git"], cwd=repo, check=True)
+        id1 = resolve_project_identity(repo)
+        
+        # Clear config and change to ssh
+        subprocess.run(["git", "config", "--local", "--unset", "vidurai.projectuuid"], cwd=repo, check=True)
+        subprocess.run(["git", "remote", "set-url", "origin", "git@github.com:org/repo.git"], cwd=repo, check=True)
+        id2 = resolve_project_identity(repo)
+        
+        assert id1['project_uuid'] == id2['project_uuid']
+        assert id1['remote_fingerprint'] == id2['remote_fingerprint']
+
+def test_changing_remote_does_not_change_established_uuid():
+    with tempfile.TemporaryDirectory() as repo:
+        setup_git_repo(repo)
+        subprocess.run(["git", "remote", "add", "origin", "https://github.com/org/repo.git"], cwd=repo, check=True)
+        id1 = resolve_project_identity(repo)
+        
+        # Change remote without unsetting config
+        subprocess.run(["git", "remote", "set-url", "origin", "https://gitlab.com/other/other.git"], cwd=repo, check=True)
+        # Add another remote
+        subprocess.run(["git", "remote", "add", "upstream", "https://github.com/org/upstream.git"], cwd=repo, check=True)
+        id2 = resolve_project_identity(repo)
+        
+        assert id1['project_uuid'] == id2['project_uuid']
+        assert id2['remote_fingerprint'] == "persisted_local"
+
+def test_different_remotes_different_uuid():
+    with tempfile.TemporaryDirectory() as repo1, tempfile.TemporaryDirectory() as repo2:
+        setup_git_repo(repo1)
+        subprocess.run(["git", "remote", "add", "origin", "https://github.com/org/repo1.git"], cwd=repo1, check=True)
+        
+        setup_git_repo(repo2)
+        subprocess.run(["git", "remote", "add", "origin", "https://github.com/org/repo2.git"], cwd=repo2, check=True)
+        
+        id1 = resolve_project_identity(repo1)
+        id2 = resolve_project_identity(repo2)
+        
+        assert id1['project_uuid'] != id2['project_uuid']
+
+def test_ambiguous_remotes_quarantined():
+    with tempfile.TemporaryDirectory() as repo:
+        setup_git_repo(repo)
+        subprocess.run(["git", "remote", "add", "remote1", "https://github.com/org/repo1.git"], cwd=repo, check=True)
+        subprocess.run(["git", "remote", "add", "remote2", "https://github.com/org/repo2.git"], cwd=repo, check=True)
+        
+        # We don't have origin or upstream, and multiple distinct URLs
+        res = resolve_project_identity(repo)
+        assert res['ambiguous']
+        assert 'Multiple remotes and no upstream/origin' in res['error']
+
+def test_no_remote_identity_persists():
+    with tempfile.TemporaryDirectory() as repo:
+        setup_git_repo(repo)
+        id1 = resolve_project_identity(repo)
+        assert not id1['ambiguous']
+        assert id1['remote_fingerprint'] == 'local_only'
+        
+        # Move path
+        with tempfile.TemporaryDirectory() as new_dir:
+            import shutil
+            shutil.copytree(repo, new_dir, dirs_exist_ok=True)
+            id2 = resolve_project_identity(new_dir)
+            assert not id2['ambiguous']
+            assert id1['project_uuid'] == id2['project_uuid']
+
+def test_linked_worktrees_share_uuid():
+    with tempfile.TemporaryDirectory() as repo:
+        setup_git_repo(repo)
+        id1 = resolve_project_identity(repo)
+        
+        # Create worktree
+        wt_path = os.path.join(tempfile.gettempdir(), f"vidurai_wt_{uuid.uuid4().hex}")
+        subprocess.run(["git", "worktree", "add", wt_path, "-b", "wt-branch"], cwd=repo, check=True)
+        try:
+            id2 = resolve_project_identity(wt_path)
+            assert id1['project_uuid'] == id2['project_uuid']
+            assert id2['branch'] == 'wt-branch'
+        finally:
+            import shutil
+            shutil.rmtree(wt_path, ignore_errors=True)
+            subprocess.run(["git", "worktree", "prune"], cwd=repo, check=False)
