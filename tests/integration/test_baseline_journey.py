@@ -37,6 +37,8 @@ class TestBaselineJourney:
         with open(self.test_file, "w") as f:
             f.write("Initial state\n")
         subprocess.run(["git", "add", "example.txt"], cwd=self.project_dir, check=True)
+        subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=self.project_dir, check=True)
+        subprocess.run(["git", "config", "user.name", "Test User"], cwd=self.project_dir, check=True)
         subprocess.run(["git", "commit", "-m", "Initial commit"], cwd=self.project_dir, check=True)
         
         self.mcp_port = self._find_free_port()
