@@ -138,6 +138,7 @@ class IPCMessage:
     type: str
     ts: int
     id: Optional[str] = None
+    token: Optional[str] = None
     data: Optional[Dict[str, Any]] = None
 
     @classmethod
@@ -147,6 +148,7 @@ class IPCMessage:
             type=data.get('type'),
             ts=data.get('ts'),
             id=data.get('id'),
+            token=data.get('token'),
             data=data.get('data')
         )
 

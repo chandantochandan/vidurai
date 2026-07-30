@@ -17,6 +17,7 @@ import { FocusWatcher } from './focusWatcher';
 import { registerMemoryTreeView } from './views/memoryTreeView';
 import { PinDecorator } from './decorators/PinDecorator';
 import { ContextPanelProvider, ContextPanelData } from './views/ContextPanel';
+import { PairingManager } from './security/PairingManager';
 
 let ipcClient: IPCClient | null = null;
 let statusBar: StatusBarManager | null = null;
@@ -28,6 +29,7 @@ let memoryTreeView: vscode.TreeView<any> | null = null;
 let pinDecorator: PinDecorator | null = null;
 let contextPanelProvider: ContextPanelProvider | null = null;
 let contextPollInterval: NodeJS.Timeout | null = null;
+let pairingManager: PairingManager | null = null;
 
 /**
  * Extension activation
@@ -85,6 +87,7 @@ export async function activate(context: vscode.ExtensionContext) {
             });
         });
 
+        pairingManager = new PairingManager(context, ipcClient);
         // Start status bar
         statusBar = new StatusBarManager(ipcClient);
         statusBar.startUpdates();

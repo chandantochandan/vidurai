@@ -194,6 +194,7 @@ export class IPCClient extends EventEmitter {
   private bufferPath: string;
   private bufferBackupPath: string;
   private isDraining: boolean = false;
+  private authToken: string | null = null;
 
   constructor(options: IPCClientOptions = {}) {
     super();
@@ -297,7 +298,15 @@ export class IPCClient extends EventEmitter {
   }
 
   /**
+   * Set the authentication token for IPC requests
+   */
+  setToken(token: string | null): void {
+    this.authToken = token;
+  }
+
+  /**
    * Connect to the daemon
+
    *
    * @returns Promise that resolves when connected
    * @throws Error if connection fails

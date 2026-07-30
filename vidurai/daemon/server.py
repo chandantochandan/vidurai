@@ -401,9 +401,36 @@ async def handle_ipc_message(client, message: IPCMessage) -> IPCResponse:
                 # Context Guard: Don't crash the Daemon on path errors
                 logger.error(f"❌ Context switch failed: {e}")
 
+        # WP-05 Pairing and Authentication
+        from .ipc.security import security_manager
+
+        # Allow handshake, pair_request without token
+        if msg_type not in ('handshake', 'pair_request'):
+            if not message.token or not security_manager.is_valid_token(message.token):
+                logger.warning(f"Rejecting unauthenticated request of type {msg_type}")
+                return IPCResponse(
+                    type="error", 
+                    id=message.id, 
+                    ok=False, 
+                    error="unauthorized", 
+                    data={"message": "Invalid or missing pairing token. Please pair extension."}
+                )
+
         # Ping/Pong for connection testing
         if msg_type == 'ping':
             return IPCResponse(type='pong', id=message.id, ok=True)
+
+        elif msg_type == 'pair_request':
+            code = msg_data.get("code")
+            if not code:
+                return IPCResponse(type="error", id=message.id, ok=False, error="invalid_request", data={"message": "Missing pairing code"})
+            try:
+                token = security_manager.verify_pairing(code)
+                logger.info(f"Successfully paired new IPC client (Session: {client.id})")
+                return IPCResponse(type="pair_ack", id=message.id, ok=True, data={"token": token})
+            except ValueError as e:
+                logger.warning(f"Pairing failed for client {client.id}: {e}")
+                return IPCResponse(type="error", id=message.id, ok=False, error="pairing_failed", data={"message": str(e)})
 
         # Phase 7.0: Handshake Protocol
         # Client must send handshake immediately after connect
@@ -1301,6 +1328,15 @@ async def startup_event():
     logger.info("")
     logger.info("🔌 Starting IPC Server...")
     try:
+        # WP-05: Ensure a pairing challenge is available on startup
+        from .ipc.security import security_manager
+        code = security_manager.generate_pairing_challenge()
+        print(f"\n=======================================================")
+        print(f"VIDURAI DAEMON STARTED")
+        print(f"VS Code Pairing Code: {code}")
+        print(f"This code will expire in 5 minutes.")
+        print(f"=======================================================\n")
+        
         ipc_server = IPCServer(message_handler=handle_ipc_message)
         await ipc_server.start()
         logger.info(f"   ✓ IPC listening on: {ipc_server.pipe_path}")

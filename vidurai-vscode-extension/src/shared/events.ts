@@ -393,6 +393,7 @@ export type IPCEventType =
   | 'heartbeat'
   | 'handshake'       // v2.2.0: Phase 7.0 Handshake Protocol (send on connect)
   | 'handshake_ack'   // v2.2.0: Server acknowledgement of handshake
+  | 'pair_request'
   | 'file_edit'
   | 'terminal'
   | 'diagnostic'
@@ -439,10 +440,13 @@ export interface IPCEvent<TData = unknown> {
   /** Unix timestamp in milliseconds */
   ts: number;
 
-  /** Optional request ID for request-response correlation */
+  /** Optional request ID for correlation */
   id?: string;
 
-  /** Event-specific data payload */
+  /** Optional authentication token for pairing */
+  token?: string;
+
+  /** Event payload */
   data?: TData;
 }
 

@@ -137,9 +137,31 @@ class TestBaselineJourney:
             assert ack.get("type") == "handshake_ack"
             assert ack.get("ok") is True
             
+            # WP-05: Authenticate
+            pairing_file = os.path.join(self.vidurai_dir, "pairing.json")
+            assert os.path.exists(pairing_file), "Pairing file not found"
+            with open(pairing_file) as f:
+                pairing_code = json.load(f)["code"]
+                
+            pair_req = {
+                "v": 1,
+                "type": "pair_request",
+                "ts": int(time.time()*1000),
+                "id": "pair",
+                "data": {"code": pairing_code}
+            }
+            sock.sendall((json.dumps(pair_req) + "\n").encode("utf-8"))
+            resp_line = ""
+            while "\n" not in resp_line:
+                resp_line += sock.recv(4096).decode("utf-8")
+            pair_ack = json.loads(resp_line.strip())
+            assert pair_ack.get("type") == "pair_ack"
+            token = pair_ack["data"]["token"]
+            
             # 2. Valid file_edit
             file_edit = {
                 "v": 1,
+                "token": token,
                 "type": "file_edit",
                 "ts": int(time.time()*1000),
                 "data": {
@@ -159,9 +181,11 @@ class TestBaselineJourney:
             # 3. Malformed event
             bad_event = {
                 "v": 1,
+                "token": token,
                 "type": "bad_event_type",
                 "ts": int(time.time()*1000),
                 "id": "evt2",
+                "token": token,
                 "data": {}
             }
             sock.sendall((json.dumps(bad_event) + "\n").encode('utf-8'))

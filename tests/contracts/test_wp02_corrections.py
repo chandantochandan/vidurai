@@ -12,9 +12,13 @@ from unittest.mock import MagicMock, AsyncMock, patch
 
 from vidurai.daemon.ipc.server import IPCMessage
 from vidurai.daemon.ipc.validation import validate_class1_evidence, normalize_aliases
+from vidurai.daemon.ipc.security import security_manager
 from vidurai.daemon.server import _handle_class1_evidence, handle_ipc_message
 import vidurai.daemon.server as server_module
 from vidurai.storage.database import MemoryDatabase, SalienceLevel
+
+# Mock security manager for tests
+security_manager.is_valid_token = lambda x: x == "test_token"
 
 # -----------------------------------------------------------------------------
 # Real Isolated DB Testing
@@ -76,7 +80,7 @@ def test_non_severe_diagnostic():
 async def _check_test_non_severe_diagnostic():
     ctx = TestContext()
     # Severity 2
-    msg = IPCMessage.from_json({"v": 1, "type": "diagnostic", "ts": 123, "id": str(uuid.uuid4()), "data": {"sev": 2, "msg": "test", "file": "a.py"}})
+    msg = IPCMessage.from_json({"v": 1, "token": "test_token", "type": "diagnostic", "ts": 123, "id": str(uuid.uuid4()), "data": {"sev": 2, "msg": "test", "file": "a.py"}})
     res = await handle_ipc_message(MagicMock(), msg)
     assert res.ok
     r, m, f = ctx.get_counts()
@@ -85,7 +89,7 @@ async def _check_test_non_severe_diagnostic():
     assert f == 0
     
     # Severity 1 (Severe)
-    msg = IPCMessage.from_json({"v": 1, "type": "diagnostic", "ts": 123, "id": str(uuid.uuid4()), "data": {"sev": 1, "msg": "test", "file": "a.py"}})
+    msg = IPCMessage.from_json({"v": 1, "token": "test_token", "type": "diagnostic", "ts": 123, "id": str(uuid.uuid4()), "data": {"sev": 1, "msg": "test", "file": "a.py"}})
     res = await handle_ipc_message(MagicMock(), msg)
     assert res.ok
     r, m, f = ctx.get_counts()
@@ -98,8 +102,8 @@ def test_class2_class3_exclusion():
 async def _check_test_class2_class3_exclusion():
     ctx = TestContext()
     msgs = [
-        IPCMessage.from_json({"v": 1, "type": "recall", "ts": 123, "data": {"query": "test"}}),
-        IPCMessage.from_json({"v": 1, "type": "ping", "ts": 123, "data": {}})
+        IPCMessage.from_json({"v": 1, "token": "test_token", "type": "recall", "ts": 123, "data": {"query": "test"}}),
+        IPCMessage.from_json({"v": 1, "token": "test_token", "type": "ping", "ts": 123, "data": {}})
     ]
     for msg in msgs:
         await handle_ipc_message(MagicMock(), msg)
@@ -117,14 +121,14 @@ async def _check_test_alias_canonical_equivalence():
     event_id = str(uuid.uuid4())
     
     # Alias
-    msg1 = IPCMessage.from_json({"v": 1, "type": "terminal_command", "ts": 123, "id": event_id, "data": {"cmd": "pytest", "project_path": "/a", "out": "test"}})
+    msg1 = IPCMessage.from_json({"v": 1, "token": "test_token", "type": "terminal_command", "ts": 123, "id": event_id, "data": {"cmd": "pytest", "project_path": "/a", "out": "test"}})
     res1 = await handle_ipc_message(MagicMock(), msg1)
     
     r1, m1, f1 = ctx.get_counts()
     assert r1 == 1
     
     # Canonical equivalent
-    msg2 = IPCMessage.from_json({"v": 1, "type": "terminal", "ts": 123, "id": event_id, "data": {"command": "pytest", "project_path": "/a", "output": "test"}})
+    msg2 = IPCMessage.from_json({"v": 1, "token": "test_token", "type": "terminal", "ts": 123, "id": event_id, "data": {"command": "pytest", "project_path": "/a", "output": "test"}})
     res2 = await handle_ipc_message(MagicMock(), msg2)
     
     r2, m2, f2 = ctx.get_counts()
@@ -139,17 +143,17 @@ async def _check_test_real_unique_index_behaviour():
     ctx = TestContext()
     event_id = str(uuid.uuid4())
     
-    msg1 = IPCMessage.from_json({"v": 1, "type": "file_edit", "ts": 123, "id": event_id, "data": {"project_path": "/a", "file": "b", "change": "c"}})
+    msg1 = IPCMessage.from_json({"v": 1, "token": "test_token", "type": "file_edit", "ts": 123, "id": event_id, "data": {"project_path": "/a", "file": "b", "change": "c"}})
     res1 = await _handle_class1_evidence(msg1, msg1.type, msg1.data)
     
     # Attempt same event ID, same payload
-    msg2 = IPCMessage.from_json({"v": 1, "type": "file_edit", "ts": 123, "id": event_id, "data": {"project_path": "/a", "file": "b", "change": "c"}})
+    msg2 = IPCMessage.from_json({"v": 1, "token": "test_token", "type": "file_edit", "ts": 123, "id": event_id, "data": {"project_path": "/a", "file": "b", "change": "c"}})
     res2 = await _handle_class1_evidence(msg2, msg2.type, msg2.data)
     assert res2.data.get('status') == 'duplicate'
     assert ctx.get_counts()[0] == 1
     
     # Attempt same event ID, different payload
-    msg3 = IPCMessage.from_json({"v": 1, "type": "file_edit", "ts": 123, "id": event_id, "data": {"project_path": "/a", "file": "b", "change": "d"}})
+    msg3 = IPCMessage.from_json({"v": 1, "token": "test_token", "type": "file_edit", "ts": 123, "id": event_id, "data": {"project_path": "/a", "file": "b", "change": "d"}})
     res3 = await _handle_class1_evidence(msg3, msg3.type, msg3.data)
     assert res3.error == "event_id_payload_conflict"
     assert res3.data.get('retryable') is False
@@ -188,7 +192,7 @@ def test_live_server_route():
 
 async def _check_test_live_server_route():
     ctx = TestContext()
-    msg = IPCMessage.from_json({"v": 1, "type": "file_edit", "ts": 123, "id": str(uuid.uuid4()), "data": {"project_path": "/a", "file": "b", "change": "c"}})
+    msg = IPCMessage.from_json({"v": 1, "token": "test_token", "type": "file_edit", "ts": 123, "id": str(uuid.uuid4()), "data": {"project_path": "/a", "file": "b", "change": "c"}})
     res = await handle_ipc_message(MagicMock(), msg)
     assert res.ok
     assert ctx.get_counts()[0] == 1
@@ -201,7 +205,7 @@ async def _check_test_durable_failure():
     ctx = TestContext()
     ctx.db.insert_event_receipt = MagicMock(return_value=False)
     
-    msg = IPCMessage.from_json({"v": 1, "type": "file_edit", "ts": 123, "id": str(uuid.uuid4()), "data": {"project_path": "/a", "file": "b", "change": "c"}})
+    msg = IPCMessage.from_json({"v": 1, "token": "test_token", "type": "file_edit", "ts": 123, "id": str(uuid.uuid4()), "data": {"project_path": "/a", "file": "b", "change": "c"}})
     res = await _handle_class1_evidence(msg, msg.type, msg.data)
     
     assert not res.ok
