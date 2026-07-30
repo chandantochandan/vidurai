@@ -149,9 +149,16 @@ def test_migration_failure_rollback():
             cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='temp_test'")
             assert cursor.fetchone() is None
             
-            conn.close()
     finally:
         migrations.MIGRATIONS[5] = original_v6
+
+    # Now remove the injected failure and prove reopening completes successfully
+    db2 = MemoryDatabase(db_path=db_path)
+    conn = sqlite3.connect(db_path)
+    res = conn.execute("SELECT value FROM metadata WHERE key='schema_version'").fetchone()
+    assert int(res[0]) == TARGET_SCHEMA_VERSION
+    conn.close()
+    db2.close()
 
 
 def test_repeated_startup_idempotent():
@@ -177,4 +184,112 @@ def test_repeated_startup_idempotent():
         assert res[0] == 1
         conn.close()
         db1.close()
+        db2.close()
+
+
+def test_v4_to_latest_upgrade():
+    # Pre-WP-02 database -> latest
+    with tempfile.TemporaryDirectory() as tmp:
+        db_path = Path(tmp) / "test.db"
+        
+        # Create base
+        _create_v1_database(db_path)
+        conn = sqlite3.connect(db_path)
+        
+        # Apply up to v4
+        import vidurai.storage.migrations as migrations
+        migrations._migration_v2(conn)
+        migrations._migration_v3(conn)
+        migrations._migration_v4(conn)
+        conn.execute("UPDATE metadata SET value = '4' WHERE key = 'schema_version'")
+        
+        # Verify FTS and memories data exist
+        conn.execute("INSERT INTO memories_fts(memory_id, gist, verbatim, tags) VALUES (1, 'gist', 'code', '')")
+        conn.commit()
+        conn.close()
+        
+        # Upgrade
+        db = MemoryDatabase(db_path=db_path)
+        
+        conn = sqlite3.connect(db_path)
+        # Verify data preserved
+        res = conn.execute("SELECT gist FROM memories WHERE id=1").fetchone()
+        assert res[0] == 'gist'
+        res = conn.execute("SELECT gist FROM memories_fts WHERE memory_id=1").fetchone()
+        assert res[0] == 'gist'
+        
+        # Verify schema version
+        res = conn.execute("SELECT value FROM metadata WHERE key='schema_version'").fetchone()
+        assert int(res[0]) == TARGET_SCHEMA_VERSION
+        
+        conn.close()
+        db.close()
+
+def test_v5_to_latest_upgrade():
+    # WP-02 database (v5) -> latest
+    with tempfile.TemporaryDirectory() as tmp:
+        db_path = Path(tmp) / "test.db"
+        
+        _create_v1_database(db_path)
+        conn = sqlite3.connect(db_path)
+        
+        import vidurai.storage.migrations as migrations
+        migrations._migration_v2(conn)
+        migrations._migration_v3(conn)
+        migrations._migration_v4(conn)
+        migrations._migration_v5(conn)
+        conn.execute("UPDATE metadata SET value = '5' WHERE key = 'schema_version'")
+        
+        # Insert event receipt
+        conn.execute("INSERT INTO event_receipts (receipt_id, event_id, event_type, payload_hash, payload_json, status, memory_id, received_at, attempt_count) VALUES ('r1', 'e1', 'type1', 'hash1', '{}', 'processed', 1, 12345, 1)")
+        conn.commit()
+        conn.close()
+        
+        # Upgrade
+        db = MemoryDatabase(db_path=db_path)
+        
+        conn = sqlite3.connect(db_path)
+        # Verify event receipt preserved
+        res = conn.execute("SELECT status, event_id, memory_id FROM event_receipts WHERE receipt_id='r1'").fetchone()
+        assert res[0] == 'processed'
+        assert res[1] == 'e1'
+        assert res[2] == 1
+        
+        conn.close()
+        db.close()
+
+def test_v6_reopen_preserves_identity():
+    # WP-03 database (v6) reopening
+    with tempfile.TemporaryDirectory() as tmp:
+        db_path = Path(tmp) / "test.db"
+        
+        # Full creation
+        db = MemoryDatabase(db_path=db_path)
+        conn = sqlite3.connect(db_path)
+        
+        # Insert WP-03 specific fields
+        conn.execute("INSERT INTO projects (id, path, name, project_uuid, remote_fingerprint) VALUES (99, '/wp03', 'wp03', 'uuid-99', 'fingerprint-99')")
+        conn.execute("INSERT INTO project_aliases (project_id, path) VALUES (99, '/alias-wp03')")
+        conn.execute("INSERT INTO event_receipts (receipt_id, event_type, payload_hash, payload_json, status, received_at, project_uuid, branch, commit_hash, detached_head) VALUES ('r99', 'type', 'hash', '{}', 'recorded', 123, 'uuid-99', 'main', 'abcdef', 0)")
+        conn.commit()
+        conn.close()
+        db.close()
+        
+        # Reopen
+        db2 = MemoryDatabase(db_path=db_path)
+        conn = sqlite3.connect(db_path)
+        
+        res = conn.execute("SELECT project_uuid, remote_fingerprint FROM projects WHERE id=99").fetchone()
+        assert res[0] == 'uuid-99'
+        assert res[1] == 'fingerprint-99'
+        
+        res = conn.execute("SELECT path FROM project_aliases WHERE project_id=99").fetchone()
+        assert res[0] == '/alias-wp03'
+        
+        res = conn.execute("SELECT branch, commit_hash, detached_head FROM event_receipts WHERE receipt_id='r99'").fetchone()
+        assert res[0] == 'main'
+        assert res[1] == 'abcdef'
+        assert res[2] == 0
+        
+        conn.close()
         db2.close()
