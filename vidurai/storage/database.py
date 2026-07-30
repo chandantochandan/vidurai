@@ -26,7 +26,9 @@ from pathlib import Path
 from typing import List, Optional, Dict, Any, Tuple, Set
 from enum import Enum
 
-logger = logging.getLogger("vidurai.database")
+from vidurai.storage.migrations import run_migrations
+
+logger = logging.getLogger("vidurai.storage")
 
 
 class SalienceLevel(Enum):
@@ -89,36 +91,38 @@ class MemoryDatabase:
     - All reads get their own connection (WAL allows parallel reads)
 
     Usage:
-        db = MemoryDatabase()
-
-        # Writes are async-safe (routed through queue)
-        memory_id = db.store_memory(project_path, verbatim, gist, salience, event_type)
-
-        # Reads are parallel (separate connection)
-        memories = db.recall_memories(project_path, query="auth")
+    Robust Queue-based SQLite database for persistent memory and file state.
     """
 
     def __init__(self, db_path: Optional[Path] = None):
+        """Initialize the database (or resume from pickle)."""
         if db_path is None:
             db_path = Path.home() / ".vidurai" / "memory.db"
-
+        db_path = Path(db_path)
         db_path.parent.mkdir(parents=True, exist_ok=True)
         self.db_path = str(db_path)
 
+        # Setup schema using the deterministic migration lifecycle
+        conn = sqlite3.connect(self.db_path)
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA synchronous=NORMAL")
+        conn.execute("PRAGMA foreign_keys=ON")
+        try:
+            run_migrations(conn)
+        finally:
+            conn.close()
+
         # 1. The Queue: Buffers high-speed write events
-        self.write_queue: queue.Queue = queue.Queue()
+        self.write_queue = queue.Queue()
         self.running = True
 
-        # 2. The Actor: A dedicated thread that owns the Write Lock
+        # 2. The Actor Thread: Strictly single-threaded writes
         self.writer_thread = threading.Thread(
             target=self._writer_loop,
             daemon=True,
             name="vidurai-db-writer"
         )
         self.writer_thread.start()
-
-        # 3. Ensure Schema (Synchronous blocking start)
-        self._init_schema_blocking()
 
         logger.info(f"Database initialized at {db_path} (Queue-Based Actor)")
 
@@ -341,275 +345,7 @@ class MemoryDatabase:
     # SCHEMA INITIALIZATION (Ironclad Rule I: Preserve all tables)
     # =========================================================================
 
-    def _init_schema_blocking(self):
-        """
-        Create database schema on startup (BLOCKING).
 
-        Ironclad Rule I: Schema Preservation
-        - All CREATE TABLE statements from v2.0 are preserved
-        - Tables: projects, memories, memories_fts, metadata, active_state, audience_gists
-        """
-        conn = sqlite3.connect(self.db_path)
-        conn.execute("PRAGMA foreign_keys=ON")
-        cursor = conn.cursor()
-
-        # Projects table
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS projects (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                path TEXT UNIQUE NOT NULL,
-                name TEXT NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                last_active TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-
-        # Memories table (Three-Kosha architecture)
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS memories (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                project_id INTEGER NOT NULL,
-
-                -- Annamaya Kosha (Physical/Verbatim)
-                verbatim TEXT NOT NULL,
-                event_type TEXT NOT NULL,
-                file_path TEXT,
-                line_number INTEGER,
-
-                -- Pranamaya Kosha (Active/Salience)
-                salience TEXT NOT NULL,
-                access_count INTEGER DEFAULT 0,
-                last_accessed TIMESTAMP,
-
-                -- Manomaya Kosha (Wisdom/Gist)
-                gist TEXT NOT NULL,
-                tags TEXT,
-
-                -- Pinning support (v2.2)
-                pinned INTEGER DEFAULT 0,
-                pin_reason TEXT,
-                pinned_at TIMESTAMP,
-
-                -- Aggregation support (v2.1)
-                occurrence_count INTEGER DEFAULT 1,
-
-                -- Metadata
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                expires_at TIMESTAMP,
-
-                FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
-            )
-        """)
-
-        # Indexes for fast queries
-        cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_memories_project
-            ON memories(project_id)
-        """)
-        cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_memories_salience
-            ON memories(salience)
-        """)
-        cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_memories_created
-            ON memories(created_at DESC)
-        """)
-        cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_memories_file
-            ON memories(file_path)
-        """)
-        cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_memories_pinned
-            ON memories(pinned) WHERE pinned = 1
-        """)
-
-        # Full-text search on gists (FTS5)
-        cursor.execute("""
-            CREATE VIRTUAL TABLE IF NOT EXISTS memories_fts
-            USING fts5(memory_id, gist, verbatim, tags)
-        """)
-
-        # Metadata table for schema versioning
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS metadata (
-                key TEXT PRIMARY KEY,
-                value TEXT NOT NULL
-            )
-        """)
-
-        # WP-03: Project aliases table
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS project_aliases (
-                project_id INTEGER NOT NULL,
-                path TEXT UNIQUE NOT NULL,
-                last_active TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY(project_id) REFERENCES projects(id)
-            )
-        """)
-
-        # v2.1: Active State table for "Current Truth" projection (Zombie Killer)
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS active_state (
-                file_path TEXT PRIMARY KEY,
-                project_id INTEGER,
-                has_errors BOOLEAN DEFAULT FALSE,
-                error_count INTEGER DEFAULT 0,
-                warning_count INTEGER DEFAULT 0,
-                last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                error_summary TEXT,
-                FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
-            )
-        """)
-
-        cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_active_state_project
-            ON active_state(project_id)
-        """)
-
-        cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_active_state_errors
-            ON active_state(has_errors) WHERE has_errors = TRUE
-        """)
-
-        # v2.2: Audience Gists table (multi-audience support)
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS audience_gists (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                memory_id INTEGER NOT NULL,
-                audience TEXT NOT NULL,
-                gist TEXT NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY(memory_id) REFERENCES memories(id) ON DELETE CASCADE,
-                UNIQUE(memory_id, audience)
-            )
-        """)
-
-        cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_audience_gists_memory
-            ON audience_gists(memory_id)
-        """)
-
-        cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_audience_gists_audience
-            ON audience_gists(audience)
-        """)
-
-        # WP-02: Event Receipts table
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS event_receipts (
-                receipt_id TEXT PRIMARY KEY NOT NULL,
-                event_id TEXT,
-                event_type TEXT NOT NULL,
-                payload_hash TEXT NOT NULL,
-                payload_json TEXT NOT NULL,
-                status TEXT NOT NULL
-                    CHECK (status IN ('recorded', 'processing', 'processed', 'failed')),
-                memory_id INTEGER,
-                received_at INTEGER NOT NULL,
-                processed_at INTEGER,
-                attempt_count INTEGER NOT NULL DEFAULT 0,
-                last_attempt_at INTEGER,
-                error_code TEXT
-            )
-        """)
-        
-        cursor.execute("""
-            CREATE UNIQUE INDEX IF NOT EXISTS idx_event_receipts_event_id
-            ON event_receipts(event_id)
-            WHERE event_id IS NOT NULL
-        """)
-        
-        cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_event_receipts_recovery
-            ON event_receipts(status, received_at)
-        """)
-
-        conn.commit()
-        conn.close()
-
-        logger.debug("Database schema initialized (all tables preserved)")
-
-        # Run migrations
-        self._check_and_migrate_schema()
-
-    def _check_and_migrate_schema(self):
-        """Check current schema version and apply migrations"""
-        conn = self.get_connection_for_reading()
-        try:
-            cursor = conn.cursor()
-
-            # Get current schema version
-            try:
-                result = cursor.execute(
-                    "SELECT value FROM metadata WHERE key = 'schema_version'"
-                ).fetchone()
-                current_version = int(result['value']) if result else 1
-            except (sqlite3.OperationalError, TypeError):
-                current_version = 1
-
-            # Apply migrations if needed
-            if current_version < 2:
-                logger.info("Migrating schema to version 2 (multi-audience gists)")
-                # audience_gists table already created in _init_schema_blocking
-                current_version = 2
-
-            if current_version < 3:
-                logger.info("Migrating schema to version 3 (v2.1 aggregation support)")
-                # Add occurrence_count column for deduplication
-                self.add_column_if_missing('memories', 'occurrence_count', 'INTEGER DEFAULT 1')
-                current_version = 3
-
-            # v2.1.0 hotfix: ensure occurrence_count exists (may have been missed in v3 migration)
-            if current_version < 4:
-                logger.info("Migrating schema to version 4 (v2.1 occurrence_count hotfix)")
-                self.add_column_if_missing('memories', 'occurrence_count', 'INTEGER DEFAULT 1')
-                current_version = 4
-
-            if current_version < 5:
-                logger.info("Migrating schema to version 5 (WP-02 event_receipts table)")
-                # event_receipts table already created additively in _init_schema_blocking
-                current_version = 5
-
-            if current_version < 6:
-                logger.info("Migrating schema to version 6 (WP-03 identity)")
-                self.add_column_if_missing('projects', 'project_uuid', 'TEXT')
-                self.add_column_if_missing('projects', 'remote_fingerprint', 'TEXT')
-                self.add_column_if_missing('event_receipts', 'project_uuid', 'TEXT')
-                self.add_column_if_missing('event_receipts', 'branch', 'TEXT')
-                self.add_column_if_missing('event_receipts', 'commit_hash', 'TEXT')
-                self.add_column_if_missing('event_receipts', 'detached_head', 'BOOLEAN')
-                
-                # WP-03: Create project_aliases table
-                future = self._enqueue("""
-                    CREATE TABLE IF NOT EXISTS project_aliases (
-                        project_id INTEGER NOT NULL,
-                        path TEXT UNIQUE NOT NULL,
-                        last_active TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        FOREIGN KEY(project_id) REFERENCES projects(id)
-                    )
-                """, ())
-                future.result()
-                
-                # Migrate existing aliases
-                future = self._enqueue("""
-                    INSERT OR IGNORE INTO project_aliases (project_id, path, last_active)
-                    SELECT id, path, last_active FROM projects
-                """, ())
-                future.result()
-                
-                current_version = 6
-
-            # Store current version (uses writer queue)
-            future = self._enqueue(
-                "INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)",
-                ('schema_version', str(current_version))
-            )
-            future.result()
-
-            logger.debug(f"Schema version: {current_version}")
-
-        finally:
-            conn.close()
 
     # =========================================================================
     # PROJECT MANAGEMENT
