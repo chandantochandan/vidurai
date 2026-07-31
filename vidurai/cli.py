@@ -1769,21 +1769,37 @@ if __name__ == '__main__':
     cli()
 
 @cli.command("mcp-gateway")
-def mcp_gateway():
+@click.option("--client-id", required=True, help="Authenticated Client ID")
+@click.option("--token", required=True, help="Authentication token")
+def mcp_gateway(client_id, token):
     """Start the standards-compliant MCP Stdio Gateway"""
     import logging
     # Disable global logging to avoid corrupting stdio transport
     logging.getLogger().setLevel(logging.CRITICAL)
-    from vidurai.daemon.mcp.gateway import main
-    main()
+    from vidurai.daemon.mcp.gateway import MCPGateway
+    import anyio
+    
+    gateway = MCPGateway(client_id=client_id, token=token)
+    try:
+        anyio.run(gateway.run)
+    except KeyboardInterrupt:
+        pass
 
 @cli.command("mcp-grant")
 @click.argument("client_id")
 @click.argument("permission", type=click.Choice(["read-only", "sensitive-read", "memory-mutation", "evidence-mutation", "admin"]))
 def mcp_grant(client_id, permission):
     """Grant an MCP permission to a client"""
-    from vidurai.daemon.mcp.permissions import PermissionManager, Permission
+    from vidurai.daemon.mcp.permissions import PermissionManager, Permission, ClientAuthenticator
     pm = PermissionManager()
+    auth = ClientAuthenticator()
+    
+    # Ensure client has a credential
+    token = auth._creds.get(client_id)
+    if not token:
+        token = auth.generate_credential(client_id)
+        click.echo(f"Generated new credential for {client_id}: {token}")
+        
     pm.grant(client_id, Permission(permission))
     click.echo(f"Granted {permission} to {client_id}")
 
@@ -1792,11 +1808,13 @@ def mcp_grant(client_id, permission):
 @click.argument("permission", required=False, type=click.Choice(["read-only", "sensitive-read", "memory-mutation", "evidence-mutation", "admin"]))
 def mcp_revoke(client_id, permission):
     """Revoke an MCP permission from a client"""
-    from vidurai.daemon.mcp.permissions import PermissionManager, Permission
+    from vidurai.daemon.mcp.permissions import PermissionManager, Permission, ClientAuthenticator
     pm = PermissionManager()
+    auth = ClientAuthenticator()
     if permission:
         pm.revoke(client_id, Permission(permission))
         click.echo(f"Revoked {permission} from {client_id}")
     else:
         pm.revoke(client_id)
-        click.echo(f"Revoked all permissions from {client_id}")
+        auth.revoke(client_id)
+        click.echo(f"Revoked all permissions and credentials from {client_id}")
