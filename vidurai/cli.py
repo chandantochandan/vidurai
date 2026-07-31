@@ -1767,3 +1767,36 @@ def audit(code, file):
 
 if __name__ == '__main__':
     cli()
+
+@cli.command("mcp-gateway")
+def mcp_gateway():
+    """Start the standards-compliant MCP Stdio Gateway"""
+    import logging
+    # Disable global logging to avoid corrupting stdio transport
+    logging.getLogger().setLevel(logging.CRITICAL)
+    from vidurai.daemon.mcp.gateway import main
+    main()
+
+@cli.command("mcp-grant")
+@click.argument("client_id")
+@click.argument("permission", type=click.Choice(["read-only", "sensitive-read", "memory-mutation", "evidence-mutation", "admin"]))
+def mcp_grant(client_id, permission):
+    """Grant an MCP permission to a client"""
+    from vidurai.daemon.mcp.permissions import PermissionManager, Permission
+    pm = PermissionManager()
+    pm.grant(client_id, Permission(permission))
+    click.echo(f"Granted {permission} to {client_id}")
+
+@cli.command("mcp-revoke")
+@click.argument("client_id")
+@click.argument("permission", required=False, type=click.Choice(["read-only", "sensitive-read", "memory-mutation", "evidence-mutation", "admin"]))
+def mcp_revoke(client_id, permission):
+    """Revoke an MCP permission from a client"""
+    from vidurai.daemon.mcp.permissions import PermissionManager, Permission
+    pm = PermissionManager()
+    if permission:
+        pm.revoke(client_id, Permission(permission))
+        click.echo(f"Revoked {permission} from {client_id}")
+    else:
+        pm.revoke(client_id)
+        click.echo(f"Revoked all permissions from {client_id}")
