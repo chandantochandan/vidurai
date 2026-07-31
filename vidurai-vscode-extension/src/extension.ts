@@ -4,6 +4,32 @@
  * v2.1 - IPC Named Pipe Transport (replaces legacy PythonBridge)
  */
 import * as vscode from 'vscode';
+
+/**
+ * Resolves the appropriate project path from the workspace.
+ * Prevents silent arbitrary selection in multi-root workspaces (WP-05).
+ */
+function resolveWorkspaceProject(uri?: vscode.Uri): string | undefined {
+    const folders = vscode.workspace.workspaceFolders;
+    if (!folders || folders.length === 0) {
+        return undefined;
+    }
+    
+    // Explicit event-derived resolution
+    if (uri) {
+        const folder = vscode.workspace.getWorkspaceFolder(uri);
+        return folder?.uri.fsPath;
+    }
+    
+    // Unambiguous single root
+    if (folders.length === 1) {
+        return folders[0].uri.fsPath;
+    }
+    
+    // Ambiguous multi-root: do not silently select folders[0]
+    return undefined;
+}
+
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -395,7 +421,7 @@ async function copyContext() {
     try {
         // v2.5: Context Guard - Always inject project_path for proper routing
         // Rule: Handle undefined gracefully (send undefined, don't throw)
-        const projectPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? undefined;
+        const projectPath = resolveWorkspaceProject();
 
         // Recall memories via IPC
         const response = await ipcClient.send<{
@@ -444,7 +470,7 @@ async function getProjectContext(audience: string = 'developer') {
 
     try {
         // v2.5: Context Guard - Handle undefined gracefully
-        const projectPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? undefined;
+        const projectPath = resolveWorkspaceProject();
 
         log('info', `Requesting ${audience} context from Oracle...`);
 
@@ -652,7 +678,7 @@ async function syncPinsFromDaemon() {
 
     try {
         // v2.5: Context Guard - Handle undefined gracefully
-        const projectPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? undefined;
+        const projectPath = resolveWorkspaceProject();
 
         log('debug', 'Syncing pins from daemon...');
 
@@ -726,7 +752,7 @@ async function refreshContextPanel() {
 
     try {
         // v2.5: Context Guard - Handle undefined gracefully
-        const projectPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? undefined;
+        const projectPath = resolveWorkspaceProject();
 
         // Request context state from daemon
         const response = await ipcClient.send<{
@@ -795,7 +821,7 @@ async function generateStandup() {
 
     try {
         // v2.5: Context Guard - Handle undefined gracefully
-        const projectPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? undefined;
+        const projectPath = resolveWorkspaceProject();
         const projectName = projectPath ? path.basename(projectPath) : 'Project';
 
         log('info', 'Generating standup report...');
@@ -921,7 +947,7 @@ async function generateReport(audience: 'manager' | 'ai') {
     }, async (progress) => {
         try {
             // v2.5: Context Guard - Handle undefined gracefully
-            const projectPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? undefined;
+            const projectPath = resolveWorkspaceProject();
             const projectName = projectPath ? path.basename(projectPath) : 'Project';
 
             progress.report({ message: 'Requesting context from daemon...' });

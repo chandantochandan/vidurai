@@ -366,6 +366,9 @@ export class IPCClient extends EventEmitter {
    */
   sendEvent<TData>(type: IPCEventType, data?: TData): boolean {
     const event = createIPCEvent(type, data);
+    if (this.authToken && type !== "handshake" && type !== "pair_request") {
+      event.token = this.authToken;
+    }
 
     if (this.isConnected()) {
       return this.writeToSocket(event);
@@ -397,6 +400,9 @@ export class IPCClient extends EventEmitter {
 
     const id = this.generateRequestId();
     const event = createIPCEvent(type, data, id);
+    if (this.authToken && type !== "handshake" && type !== "pair_request") {
+      event.token = this.authToken;
+    }
 
     return new Promise((resolve, reject) => {
       // Set up timeout

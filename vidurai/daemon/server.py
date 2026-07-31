@@ -420,6 +420,12 @@ async def handle_ipc_message(client, message: IPCMessage) -> IPCResponse:
         if msg_type == 'ping':
             return IPCResponse(type='pong', id=message.id, ok=True)
 
+        elif msg_type == 'revoke_request':
+            if message.token:
+                security_manager.revoke_token(message.token)
+                logger.info(f"Revoked session token for client {client.id}")
+            return IPCResponse(type="revoke_ack", id=message.id, ok=True)
+
         elif msg_type == 'pair_request':
             code = msg_data.get("code")
             if not code:
