@@ -1854,7 +1854,17 @@ def approve_capsule_cmd(capsule_id, client_id):
     from vidurai.daemon.capsules.service import CapsuleService
     db = get_db()
     service = CapsuleService(db)
-    if service.approve_capsule(client_id, capsule_id):
+    
+    capsule = service.get_capsule(capsule_id)
+    if not capsule:
+        click.echo("Failed to approve. Capsule not found.")
+        return
+        
+    with db.get_connection_for_reading() as conn:
+        row = conn.execute("SELECT path FROM projects WHERE project_uuid = ?", (capsule.project_uuid,)).fetchone()
+    project_path = row['path'] if row else ""
+        
+    if service.approve_capsule(client_id, capsule_id, project_path=project_path):
         click.echo("Approved.")
     else:
         click.echo("Failed to approve.")

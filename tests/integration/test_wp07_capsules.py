@@ -27,12 +27,11 @@ def test_capsule_generation_and_consumption(db_and_dir):
     # low salience -> WORKING
     # tags 'contradict' -> CONTRADICTION
     # tags 'unresolved' -> UNRESOLVED
-    
-    db.store_memory(tmpdir, "test1", "gist1", SalienceLevel.HIGH, "test_event")
-    db.store_memory(tmpdir, "test2", "gist2", SalienceLevel.LOW, "test_event")
-    db.store_memory(tmpdir, "test3", "gist3", SalienceLevel.MEDIUM, "test_event", tags=["contradict"])
-    db.store_memory(tmpdir, "test4", "gist4", SalienceLevel.MEDIUM, "test_event", tags=["unresolved"])
-    db.store_memory(tmpdir, "test5", "gist5", SalienceLevel.MEDIUM, "test_event") # EVIDENCE
+    db.store_memory(tmpdir, "test1", "gist1 task", SalienceLevel.HIGH, "test_event", tags=["decision"])
+    db.store_memory(tmpdir, "test2", "gist2 task", SalienceLevel.LOW, "test_event") # defaults to WORKING
+    db.store_memory(tmpdir, "test3", "gist3 task", SalienceLevel.MEDIUM, "test_event", tags=["contradict"])
+    db.store_memory(tmpdir, "test4", "gist4 task", SalienceLevel.MEDIUM, "test_event", tags=["unresolved"])
+    db.store_memory(tmpdir, "test5", "gist5 task", SalienceLevel.MEDIUM, "test_event", tags=["evidence"])
     
     service = CapsuleService(db)
     
@@ -52,7 +51,7 @@ def test_capsule_generation_and_consumption(db_and_dir):
     assert len(capsule.excluded_items) == 2 # 5 total matching, max 3
     
     # 2. Cannot consume without approval
-    res = service.consume_capsule("client1", capsule.capsule_id)
+    res = service.consume_capsule("client1", capsule.capsule_id, project_path=tmpdir)
     assert res is None
     
     # 3. Reject
@@ -70,10 +69,10 @@ def test_capsule_generation_and_consumption(db_and_dir):
         max_items=50,
         project_path=tmpdir
     )
-    assert service.approve_capsule("client1", capsule2.capsule_id)
+    assert service.approve_capsule("client1", capsule2.capsule_id, project_path=tmpdir)
     
     # 5. Consume
-    consumed = service.consume_capsule("client1", capsule2.capsule_id)
+    consumed = service.consume_capsule("client1", capsule2.capsule_id, project_path=tmpdir)
     assert consumed is not None
     assert consumed.delivery_count == 1
     assert len(consumed.items) == 1

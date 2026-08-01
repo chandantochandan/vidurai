@@ -358,7 +358,7 @@ class MCPGateway:
                     
                 db = self._get_db()
                 service = CapsuleService(db)
-                ok = service.approve_capsule(self.client_id, capsule_id)
+                ok = service.approve_capsule(self.client_id, capsule_id, project_path=project_path)
                 
                 if not ok:
                     return types.CallToolResult(is_error=True, content=[types.TextContent(type="text", text="Error: Cannot approve capsule.")])
@@ -388,7 +388,7 @@ class MCPGateway:
                     
                 db = self._get_db()
                 service = CapsuleService(db)
-                capsule = service.consume_capsule(self.client_id, capsule_id)
+                capsule = service.consume_capsule(self.client_id, capsule_id, project_path=project_path)
                 
                 if not capsule:
                     return types.CallToolResult(is_error=True, content=[types.TextContent(type="text", text="Error: Cannot consume capsule. It may not be approved or belongs to another client.")])

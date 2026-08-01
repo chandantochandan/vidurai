@@ -81,11 +81,22 @@ class ContextCapsule:
 
     def compute_hash(self) -> str:
         import hashlib
+        items_for_hash = []
+        for i in self.items:
+            # Exclude item_id as it's randomly generated per preview
+            items_for_hash.append({
+                "category": i.category.value,
+                "content": i.content,
+                "source_id": i.source_id,
+                "inclusion_reason": i.inclusion_reason,
+                "provenance": i.provenance
+            })
+            
         data = {
             "project_uuid": self.project_uuid,
             "branch": self.branch,
             "task": self.task,
-            "items": [i.to_dict() for i in self.items]
+            "items": items_for_hash
         }
         json_bytes = json.dumps(data, sort_keys=True).encode("utf-8")
         return hashlib.sha256(json_bytes).hexdigest()

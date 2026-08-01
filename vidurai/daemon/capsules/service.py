@@ -13,19 +13,15 @@ class CapsuleService:
     def __init__(self, db: MemoryDatabase):
         self.db = db
 
-    def generate_preview(
+
+    def _build_preview_state(
         self,
-        client_id: str,
+        project_path: str,
         project_uuid: str,
-        branch: Optional[str],
         task: str,
         requested_categories: List[CapsuleCategory],
-        max_items: int = 50,
-        project_path: str = ""
-    ) -> ContextCapsule:
-        """
-        Generate a Context Capsule preview by selecting minimum sufficient truth from the DB.
-        """
+        max_items: int
+    ) -> tuple[List[CapsuleItem], List[CapsuleExcludedItem], str]:
         project_id = self.db.get_or_create_project(project_path)
         
         with self.db.get_connection_for_reading() as conn:
@@ -35,32 +31,50 @@ class CapsuleService:
         
         items = []
         excluded_items = []
+        task_keywords = set(task.lower().split()) if task else set()
         
         for mem in memories:
             mem_id = mem['id']
-            salience = mem['salience'].lower()
-            
-            cat = CapsuleCategory.EVIDENCE
-            if salience == 'high':
-                cat = CapsuleCategory.DECISION
-            elif salience == 'low':
-                cat = CapsuleCategory.WORKING
-                
             tags = mem.get('tags') or ''
+            gist = mem['gist']
+            
+            cat = CapsuleCategory.WORKING
+            if 'evidence' in tags:
+                cat = CapsuleCategory.EVIDENCE
+            if 'decision' in tags:
+                cat = CapsuleCategory.DECISION
+            if 'interpretation' in tags:
+                cat = CapsuleCategory.INTERPRETATION
+            if 'recommendation' in tags:
+                cat = CapsuleCategory.RECOMMENDATION
             if 'contradict' in tags:
                 cat = CapsuleCategory.CONTRADICTION
-                
             if 'unresolved' in tags:
                 cat = CapsuleCategory.UNRESOLVED
                 
+            is_relevant = True
+            if task_keywords:
+                gist_lower = gist.lower()
+                is_relevant = any(kw in gist_lower for kw in task_keywords)
+                
+            if not is_relevant:
+                excluded_items.append(CapsuleExcludedItem(
+                    item_id=str(uuid.uuid4()),
+                    exclusion_reason="Not relevant to task"
+                ))
+                continue
+                
             if cat in requested_categories:
                 if len(items) < max_items:
+                    import re
+                    safe_content = re.sub(r'sk-[A-Za-z0-9_]{20,}', '[REDACTED SECRET]', gist)
+                    
                     items.append(CapsuleItem(
                         item_id=str(uuid.uuid4()),
                         category=cat,
-                        content=mem['gist'],
+                        content=safe_content,
                         source_id=str(mem_id),
-                        inclusion_reason="Matches requested category and project",
+                        inclusion_reason="Matches requested category, project, and task relevance",
                         provenance=f"vidurai://memory/{mem_id}"
                     ))
                 else:
@@ -74,6 +88,31 @@ class CapsuleService:
                     exclusion_reason=f"Category {cat.value} not requested"
                 ))
                 
+        # Compute temporary hash
+        temp_capsule = ContextCapsule(
+            capsule_id="temp", client_id="temp", project_uuid=project_uuid,
+            branch=None, task=task, content_hash="", status=CapsuleStatus.PREVIEW,
+            items=items, excluded_items=excluded_items
+        )
+        return items, excluded_items, temp_capsule.compute_hash()
+
+    def generate_preview(
+        self,
+        client_id: str,
+        project_uuid: str,
+        branch: Optional[str],
+        task: str,
+        requested_categories: List[CapsuleCategory],
+        max_items: int = 50,
+        project_path: str = ""
+    ) -> ContextCapsule:
+        """
+        Generate a Context Capsule preview by selecting minimum sufficient truth from the DB.
+        """
+        items, excluded_items, content_hash = self._build_preview_state(
+            project_path, project_uuid, task, requested_categories, max_items
+        )
+        
         capsule_id = str(uuid.uuid4())
         
         capsule = ContextCapsule(
@@ -82,12 +121,11 @@ class CapsuleService:
             project_uuid=project_uuid,
             branch=branch,
             task=task,
-            content_hash="",
+            content_hash=content_hash,
             status=CapsuleStatus.PREVIEW,
             items=items,
             excluded_items=excluded_items
         )
-        capsule.content_hash = capsule.compute_hash()
         
         self._save_capsule(capsule)
         
@@ -164,9 +202,26 @@ class CapsuleService:
             
         return capsule
 
-    def approve_capsule(self, client_id: str, capsule_id: str) -> bool:
+    def approve_capsule(self, client_id: str, capsule_id: str, project_path: str = "") -> bool:
         capsule = self.get_capsule(capsule_id)
         if not capsule or capsule.client_id != client_id or capsule.status != CapsuleStatus.PREVIEW:
+            return False
+            
+        # Check staleness
+        requested_cats = list(set(item.category for item in capsule.items)) # Approximate requested categories
+        if not requested_cats:
+            # Fallback if no items were matched previously
+            requested_cats = [CapsuleCategory.EVIDENCE, CapsuleCategory.DECISION, CapsuleCategory.WORKING, CapsuleCategory.UNRESOLVED, CapsuleCategory.CONTRADICTION, CapsuleCategory.INTERPRETATION, CapsuleCategory.RECOMMENDATION]
+        
+        max_items = len(capsule.items) + len(capsule.excluded_items)
+        _, _, current_hash = self._build_preview_state(
+            project_path, capsule.project_uuid, capsule.task, requested_cats, max_items
+        )
+        
+        if current_hash != capsule.content_hash:
+            logger.warning("Capsule preview is stale. Source records changed.")
+            # Auto-reject stale capsule
+            self.reject_capsule(client_id, capsule_id)
             return False
             
         future = self.db._enqueue(
@@ -188,9 +243,12 @@ class CapsuleService:
         future.result()
         return True
 
-    def consume_capsule(self, client_id: str, capsule_id: str) -> Optional[ContextCapsule]:
+    def consume_capsule(self, client_id: str, capsule_id: str, project_path: str = "") -> Optional[ContextCapsule]:
         capsule = self.get_capsule(capsule_id)
         if not capsule or capsule.client_id != client_id or capsule.status != CapsuleStatus.APPROVED:
+            return None
+            
+        if capsule.expires_at and datetime.now().isoformat() > capsule.expires_at:
             return None
             
         future = self.db._enqueue(
