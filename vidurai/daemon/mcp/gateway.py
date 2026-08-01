@@ -308,9 +308,14 @@ class MCPGateway:
                     return types.CallToolResult(is_error=True, content=[types.TextContent(type="text", text="Error: task is required.")])
                     
                 requested = []
+                sensitive_cats = {CapsuleCategory.DECISION, CapsuleCategory.INTERPRETATION, CapsuleCategory.RECOMMENDATION, CapsuleCategory.CONTRADICTION}
                 for c in cats:
                     try:
-                        requested.append(CapsuleCategory(c))
+                        cat = CapsuleCategory(c)
+                        if cat in sensitive_cats:
+                            if not self._verify_permission(Permission.SENSITIVE_READ, project_path, "request_capsule_preview"):
+                                return types.CallToolResult(is_error=True, content=[types.TextContent(type="text", text=f"Error: Permission denied. Category {c} requires sensitive-read permission.")])
+                        requested.append(cat)
                     except ValueError:
                         return types.CallToolResult(is_error=True, content=[types.TextContent(type="text", text=f"Error: Invalid category {c}.")])
                         
@@ -382,6 +387,7 @@ class MCPGateway:
                 
             elif name == "consume_capsule":
                 from vidurai.daemon.capsules.service import CapsuleService
+                from vidurai.daemon.capsules.models import CapsuleCategory
                 capsule_id = args.get("capsule_id")
                 if not capsule_id:
                     return types.CallToolResult(is_error=True, content=[types.TextContent(type="text", text="Error: capsule_id is required.")])
@@ -391,8 +397,15 @@ class MCPGateway:
                 capsule = service.consume_capsule(self.client_id, capsule_id, project_path=project_path)
                 
                 if not capsule:
-                    return types.CallToolResult(is_error=True, content=[types.TextContent(type="text", text="Error: Cannot consume capsule. It may not be approved or belongs to another client.")])
+                    return types.CallToolResult(is_error=True, content=[types.TextContent(type="text", text="Error: Cannot consume capsule. It may not be approved, belongs to another client, or has expired.")])
                     
+                # Re-verify sensitive read upon consumption
+                sensitive_cats = {CapsuleCategory.DECISION, CapsuleCategory.INTERPRETATION, CapsuleCategory.RECOMMENDATION, CapsuleCategory.CONTRADICTION}
+                for item in capsule.items:
+                    if item.category in sensitive_cats:
+                        if not self._verify_permission(Permission.SENSITIVE_READ, project_path, "consume_capsule"):
+                            return types.CallToolResult(is_error=True, content=[types.TextContent(type="text", text=f"Error: Permission denied. Capsule contains sensitive category {item.category.value} but sensitive-read permission is missing.")])
+                            
                 return types.CallToolResult(is_error=False, content=[types.TextContent(type="text", text=json.dumps(capsule.to_dict()))])
 
             else:

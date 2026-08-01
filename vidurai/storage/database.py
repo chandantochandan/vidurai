@@ -97,7 +97,9 @@ class MemoryDatabase:
     def __init__(self, db_path: Optional[Path] = None):
         """Initialize the database (or resume from pickle)."""
         if db_path is None:
-            db_path = Path.home() / ".vidurai" / "memory.db"
+            import os
+            vidurai_home = Path(os.getenv("VIDURAI_HOME", Path.home() / ".vidurai"))
+            db_path = vidurai_home / "memory.db"
         db_path = Path(db_path)
         db_path.parent.mkdir(parents=True, exist_ok=True)
         self.db_path = str(db_path)

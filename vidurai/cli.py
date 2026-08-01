@@ -123,7 +123,7 @@ def cli():
 # ============================================================================
 
 # Constants for daemon management
-VIDURAI_HOME = Path.home() / ".vidurai"
+VIDURAI_HOME = Path(os.getenv("VIDURAI_HOME", Path.home() / ".vidurai"))
 PID_FILE = VIDURAI_HOME / "daemon.pid"
 LOG_FILE = VIDURAI_HOME / "vidurai.log"
 
@@ -1835,7 +1835,8 @@ def capsule():
 @capsule.command("list-pending")
 def list_pending():
     """List all pending Context Capsule previews."""
-    db = get_db()
+    from vidurai.storage.database import MemoryDatabase
+    db = MemoryDatabase()
     with db.get_connection_for_reading() as conn:
         rows = conn.execute("SELECT capsule_id, client_id, task, created_at FROM context_capsules WHERE status = 'preview'").fetchall()
     
@@ -1852,7 +1853,8 @@ def list_pending():
 def approve_capsule_cmd(capsule_id, client_id):
     """Approve a context capsule preview"""
     from vidurai.daemon.capsules.service import CapsuleService
-    db = get_db()
+    from vidurai.storage.database import MemoryDatabase
+    db = MemoryDatabase()
     service = CapsuleService(db)
     
     capsule = service.get_capsule(capsule_id)
@@ -1875,9 +1877,15 @@ def approve_capsule_cmd(capsule_id, client_id):
 def reject_capsule_cmd(capsule_id, client_id):
     """Reject a context capsule preview"""
     from vidurai.daemon.capsules.service import CapsuleService
-    db = get_db()
+    from vidurai.storage.database import MemoryDatabase
+    db = MemoryDatabase()
     service = CapsuleService(db)
     if service.reject_capsule(client_id, capsule_id):
         click.echo("Rejected.")
     else:
         click.echo("Failed to reject.")
+
+cli.add_command(capsule)
+
+if __name__ == '__main__':
+    cli()
