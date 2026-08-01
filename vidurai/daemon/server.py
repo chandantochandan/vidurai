@@ -202,160 +202,37 @@ async def _remember_async(memory_args: Dict[str, Any]) -> None:
     except Exception as e:
         logger.error(f"[Vismriti] Remember failed: {e}")
 
-async def _process_receipt_async(receipt_id: str, memory_args: Dict[str, Any], event_type: str, msg_data: Dict[str, Any] = None) -> None:
-    """
-    WP-02: Asynchronous dispatch after receipt commit.
-    """
-    global memory_db
-    if not memory_db:
-        logger.warning(f"[WP-02] Dropping receipt {receipt_id} - no database")
-        return
-        
-    try:
-        # Instead of generic remember(), we use the atomic transaction if we have a memory_args
-        # Wait, if we use memory_db.process_memory_from_receipt, it goes straight to SQLite.
-        # It needs the parsed args from EventAdapter.
-        
-        # But wait, vismriti_brain does gist extraction!
-        # If extract_gist is true, we should do it first.
-        # But memory_args from Class 1 events usually have extract_gist=False.
-        
-        if memory_args:
-            metadata = memory_args.get('metadata', {})
-            # Execute atomic transaction
-            await asyncio.to_thread(
-                memory_db.process_memory_from_receipt,
-                receipt_id=receipt_id,
-                project_path=metadata.get('project_path') or metadata.get('project') or (msg_data.get('project_path') if msg_data else '') or (msg_data.get('project') if msg_data else '') or '',
-                verbatim=memory_args.get('content', ''),
-                gist=metadata.get('message', '') or metadata.get('gist', '') or memory_args.get('content', ''),
-                salience=memory_args.get('salience'),
-                event_type=event_type,
-                file_path=metadata.get('file'),
-                line_number=metadata.get('line') or metadata.get('lines'),
-                tags=[],
-                retention_days=None,
-                created_at=None,
-                identity=msg_data.get('_identity') if msg_data else None
-            )
-            logger.info(f"[WP-02] Successfully processed receipt {receipt_id}")
-        else:
-            # If EventAdapter returned None (e.g. noise diagnostic), we just mark it processed
-            await asyncio.to_thread(
-                memory_db.update_receipt_status,
-                receipt_id=receipt_id,
-                status='processed'
-            )
-            
-    except Exception as e:
-        logger.error(f"[WP-02] Failed to process receipt {receipt_id}: {e}")
-        await asyncio.to_thread(memory_db.handle_processing_failure, receipt_id, str(e))
-
-
 async def _handle_class1_evidence(message: IPCMessage, msg_type: str, msg_data: Dict[str, Any]) -> IPCResponse:
     """
     WP-02: Handle Class 1 Validation, Normalization, Idempotency and Receipt generation.
     Returns the IPCResponse to send back.
     """
-    from vidurai.daemon.ipc.validation import validate_class1_evidence, generate_canonical_payload, normalize_aliases
-    
     global memory_db
-    if not memory_db:
-        return IPCResponse(type='error', id=message.id, ok=False, error="Database not available")
-        
-    # 1. Normalise Aliases
-    norm_type, norm_data = normalize_aliases(msg_type, msg_data)
-        
-    # 2. Validation
-    is_valid, err_code, err_msg = validate_class1_evidence(message.v, norm_type, message.ts, message.id, norm_data)
-    if not is_valid:
-        return IPCResponse(
-            type='error',
-            id=message.id,
-            ok=False,
-            error=err_code,
-            data={'retryable': False}
-        )
-        
-    # 2.5 WP-03: Project Identity Resolution
-    project_path = norm_data.get('project_path') or norm_data.get('project') or ''
-    from vidurai.daemon.identity import resolve_project_identity
-    identity = resolve_project_identity(project_path)
+    from vidurai.daemon.ingestion import ingest_class1_evidence
     
-    if identity.get('ambiguous'):
-        # Quarantine ambiguous identity
-        return IPCResponse(
-            type='error',
-            id=message.id,
-            ok=False,
-            error="ambiguous_project_identity",
-            data={'retryable': False, 'reason': identity.get('error')}
-        )
-        
-    # Inject identity into norm_data so _process_receipt_async can use it for DB insertion
-    norm_data['_identity'] = identity
-
-    # 3. Canonical JSON and Hash
-    ts = message.ts or int(time.time() * 1000)
-    canon_json = generate_canonical_payload(message.v, norm_type, ts, norm_data)
-    payload_hash = generate_canonical_hash(canon_json)
-    
-    # 4. Idempotency Check
-    receipt_id = str(uuid.uuid4())
-    event_id = message.id
-    
-    if event_id:
-        existing = await asyncio.to_thread(memory_db.get_receipt_by_event_id, event_id)
-        if existing:
-            if existing['payload_hash'] == payload_hash:
-                return IPCResponse(
-                    type='ack',
-                    id=message.id,
-                    ok=True,
-                    data={'status': 'duplicate', 'receipt_id': existing['receipt_id']}
-                )
-            else:
-                return IPCResponse(
-                    type='error',
-                    id=message.id,
-                    ok=False,
-                    error="event_id_payload_conflict",
-                    data={'retryable': False}
-                )
-                
-    # 5. Durable Commit
-    success = await asyncio.to_thread(
-        memory_db.insert_event_receipt,
-        receipt_id=receipt_id,
-        event_type=norm_type,
-        payload_hash=payload_hash,
-        payload_json=canon_json,
-        status='recorded',
-        received_at=int(time.time() * 1000),
-        event_id=event_id,
-        identity=identity
+    success, result = await ingest_class1_evidence(
+        memory_db=memory_db,
+        msg_version=message.v,
+        msg_id=message.id,
+        msg_ts=message.ts,
+        msg_type=msg_type,
+        msg_data=msg_data
     )
     
     if not success:
         return IPCResponse(
-            type='error',
+            type="error",
             id=message.id,
             ok=False,
-            error="internal_durable_write_failure",
-            data={'retryable': True}
+            error=result.get("error", "unknown_error"),
+            data={"retryable": result.get("retryable", False), "reason": result.get("reason", "")}
         )
         
-    # 6. Background Dispatch
-    memory_args = EventAdapter.adapt(norm_data, norm_type)
-    asyncio.create_task(_process_receipt_async(receipt_id, memory_args, norm_type, msg_data))
-    
-    status_msg = 'recorded' if event_id else 'legacy_unkeyed'
-    # 6. ACK Boundary
     return IPCResponse(
-        type='ack',
+        type="ack",
         id=message.id,
         ok=True,
-        data={'status': status_msg, 'receipt_id': receipt_id}
+        data=result
     )
 
 

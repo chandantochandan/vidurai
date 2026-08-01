@@ -2,44 +2,56 @@ import sys
 import json
 import logging
 import anyio
-from typing import Optional, Dict, Any, List
-from mcp.server import Server
-import mcp.types as types
-from mcp.server.stdio import stdio_server
 import uuid
 import os
 import asyncio
+import time
+from typing import Optional, Dict, Any, List
+
+from mcp.server import Server
+import mcp.types as types
+from mcp.server.stdio import stdio_server
 
 from vidurai.daemon.mcp.permissions import PermissionManager, Permission, ClientAuthenticator
 from vidurai.storage.database import MemoryDatabase, SalienceLevel
 from vidurai.vismriti_memory import VismritiMemory
+from vidurai.daemon.ingestion import ingest_class1_evidence
 
 logger = logging.getLogger("vidurai.mcp.gateway")
 
 class MCPGateway:
     """MCP Gateway for Vidurai"""
     
-    def __init__(self, client_id: str, token: str, db_path: Optional[str] = None, config_dir: Optional[str] = None):
+    def __init__(self, client_id: str, token: str, db_path: Optional[str] = None, config_dir: Optional[Any] = None):
         self.server = Server("vidurai-mcp")
         self.permission_manager = PermissionManager(config_dir)
         self.authenticator = ClientAuthenticator(config_dir)
         self.db_path = db_path
         self.client_id = client_id
+        self.token = token
         
         # Immediate authentication check
-        if not self.authenticator.verify(client_id, token):
-            logger.critical(f"MCP Gateway failed authentication for client '{client_id}'")
+        if not self.authenticator.verify(self.client_id, self.token):
+            logger.critical(f"MCP Gateway failed authentication for client '{self.client_id}'")
             raise ValueError("Authentication failed")
             
         # Setup MCP handlers
         self.server._request_handlers[types.ListToolsRequest] = self.list_tools
-        self.server._request_handlers[types.CallToolRequest] = self.call_tool
+        self.server._request_handlers[types.CallToolRequest] = self.call_tool_with_safeguards
         
     def _get_db(self) -> MemoryDatabase:
         return MemoryDatabase(self.db_path)
 
+    def _check_auth_active(self) -> bool:
+        """Check if the client's token is still valid (not revoked)."""
+        # Force reload to see changes from disk
+        self.authenticator._load()
+        return self.authenticator.verify(self.client_id, self.token)
+
     def _verify_permission(self, permission: Permission, project_scope: str, operation: str) -> bool:
         """Verify permission for the authenticated client and record audit."""
+        # Force reload permissions
+        self.permission_manager._load()
         has_perm = self.permission_manager.has_permission(self.client_id, permission)
         outcome = "granted" if has_perm else "denied"
         self.permission_manager.audit(
@@ -53,6 +65,9 @@ class MCPGateway:
         return has_perm
 
     async def list_tools(self, request: types.ListToolsRequest) -> types.ListToolsResult:
+        if not self._check_auth_active():
+            raise RuntimeError("Authentication revoked during active session")
+            
         tools = [
             types.Tool(
                 name="get_project_context",
@@ -85,13 +100,33 @@ class MCPGateway:
                     "properties": {
                         "project_path": {"type": "string", "description": "Absolute path to the project root"},
                         "content": {"type": "string", "description": "Evidence content string"},
-                        "source": {"type": "string", "description": "Source component identifier"}
+                        "source": {"type": "string", "description": "Source component identifier"},
+                        "event_id": {"type": "string", "description": "Optional UUID to ensure idempotency"}
                     },
                     "required": ["project_path", "content", "source"]
                 }
             )
         ]
         return types.ListToolsResult(tools=tools)
+
+    async def call_tool_with_safeguards(self, request: types.CallToolRequest) -> types.CallToolResult:
+        """Wrapper to enforce session auth, size limits, and timeouts."""
+        if not self._check_auth_active():
+            return types.CallToolResult(is_error=True, content=[types.TextContent(type="text", text="Error: Authentication revoked.")])
+            
+        # Size limit check (simulate by checking args length since we can't easily intercept raw stdio bytes here)
+        args_str = json.dumps(request.params.arguments or {})
+        if len(args_str) > 1024 * 1024:  # 1MB limit
+            return types.CallToolResult(is_error=True, content=[types.TextContent(type="text", text="Error: Payload exceeds maximum size limit (1MB).")])
+            
+        try:
+            # 30 second timeout for any tool call
+            return await asyncio.wait_for(self.call_tool(request), timeout=30.0)
+        except asyncio.TimeoutError:
+            return types.CallToolResult(is_error=True, content=[types.TextContent(type="text", text="Error: Request timed out.")])
+        except asyncio.CancelledError:
+            logger.info("Request cancelled by client disconnect")
+            raise
 
     async def call_tool(self, request: types.CallToolRequest) -> types.CallToolResult:
         name = request.params.name
@@ -151,7 +186,8 @@ class MCPGateway:
                     "project": project_path,
                     "client": self.client_id,
                     "permission_used": "read-only",
-                    "categories_released": ["memory"]
+                    "categories_released": ["memory"],
+                    "note": "Unresolved or ambiguous memories are labeled with null provenance or low salience."
                 }
                 
                 return types.CallToolResult(is_error=False, content=[types.TextContent(type="text", text=json.dumps({"results": formatted, "_metadata": metadata}) )])
@@ -162,72 +198,40 @@ class MCPGateway:
                 
                 content = args.get("content")
                 source = args.get("source")
+                event_id = args.get("event_id") or str(uuid.uuid4())
+                msg_ts = args.get("timestamp") or int(time.time() * 1000)
+                
                 if not content or not source:
                     return types.CallToolResult(is_error=True, content=[types.TextContent(type="text", text="Error: content and source are required.")])
                 
                 db = self._get_db()
-                project_id = db.get_or_create_project(project_path)
-                with db.get_connection_for_reading() as conn:
-                    row = conn.execute("SELECT project_uuid, path FROM projects WHERE id = ?", (project_id,)).fetchone()
                 
-                if not row:
-                    return types.CallToolResult(is_error=True, content=[types.TextContent(type="text", text="Error: Project not found.")])
-                
-                import time
-                from datetime import datetime
-                import hashlib
-                
-                event_id = str(uuid.uuid4())
-                receipt_id = f"mcp-{int(time.time()*1000)}-{event_id[:8]}"
-                event_type = "mcp_evidence"
-                
-                # Create WP-02 pipeline receipt
-                payload = {"content": content, "source": source, "mcp_client": self.client_id}
-                payload_json = json.dumps(payload)
-                payload_hash = hashlib.sha256(payload_json.encode('utf-8')).hexdigest()
-                
-                # We need project context for the receipt
-                identity = {
-                    "project_uuid": row[0],
-                    "branch": "main",  # In standard cases, you'd resolve the branch
-                    "commit": None,
-                    "detached": False
+                # WP-06 Shared Evidence Ingestion Pipeline
+                msg_data = {
+                    "project_path": project_path,
+                    "content": content,
+                    "metadata": {
+                        "source": source,
+                        "mcp_client": self.client_id
+                    }
                 }
                 
-                try:
-                    # Enqueue receipt
-                    db.insert_event_receipt(
-                        receipt_id=receipt_id,
-                        event_type=event_type,
-                        payload_hash=payload_hash,
-                        payload_json=payload_json,
-                        status="accepted",
-                        received_at=int(time.time() * 1000),
-                        event_id=event_id,
-                        identity=identity
-                    )
-                except Exception as e:
-                    if "UNIQUE constraint failed" in str(e):
-                        return types.CallToolResult(is_error=True, content=[types.TextContent(type="text", text="Error: Duplicate event ID conflict.")])
-                    raise
-
-                # Process memory
-                try:
-                    memory_id = db.process_memory_from_receipt(
-                        receipt_id=receipt_id,
-                        project_path=project_path,
-                        verbatim=content,
-                        gist=content,
-                        salience=SalienceLevel.MEDIUM,
-                        event_type=event_type,
-                        created_at=datetime.now(),
-                        identity=identity
-                    )
-                except Exception as e:
-                    db.update_receipt_status(receipt_id, "failed", str(e))
-                    raise
+                success, result = await ingest_class1_evidence(
+                    memory_db=db,
+                    msg_version=1,
+                    msg_id=event_id,
+                    msg_ts=msg_ts,
+                    msg_type="mcp_evidence",
+                    msg_data=msg_data
+                )
                 
-                return types.CallToolResult(is_error=False, content=[types.TextContent(type="text", text=json.dumps({"status": "success", "receipt_id": receipt_id, "memory_id": str(memory_id), "event_id": event_id}) )])
+                if not success:
+                    error_msg = result.get("error", "unknown_error")
+                    if error_msg == "event_id_payload_conflict":
+                        error_msg = "Duplicate event ID conflict with different payload."
+                    return types.CallToolResult(is_error=True, content=[types.TextContent(type="text", text=f"Error: {error_msg}")])
+                
+                return types.CallToolResult(is_error=False, content=[types.TextContent(type="text", text=json.dumps({"status": result.get("status", "success"), "receipt_id": result.get("receipt_id"), "event_id": event_id}) )])
 
             else:
                 return types.CallToolResult(is_error=True, content=[types.TextContent(type="text", text=f"Error: Unknown tool '{name}'.")])
@@ -239,25 +243,4 @@ class MCPGateway:
     async def run(self):
         """Run the MCP stdio server"""
         async with stdio_server() as (read_stream, write_stream):
-            # 6. Transport and request safety
-            # stdio_server inherently handles framing, validation, and JSON-RPC
             await self.server.run(read_stream, write_stream, self.server.create_initialization_options())
-
-def main():
-    import argparse
-    parser = argparse.ArgumentParser(description="Vidurai MCP Gateway")
-    parser.add_argument("--client-id", required=True, help="Authenticated Client ID")
-    parser.add_argument("--token", required=True, help="Authentication token")
-    args = parser.parse_args()
-    
-    gateway = MCPGateway(client_id=args.client_id, token=args.token)
-    try:
-        anyio.run(gateway.run)
-    except KeyboardInterrupt:
-        pass
-    except Exception as e:
-        logger.error(f"Gateway failed: {e}")
-        sys.exit(1)
-
-if __name__ == "__main__":
-    main()

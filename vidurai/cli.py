@@ -1770,12 +1770,19 @@ if __name__ == '__main__':
 
 @cli.command("mcp-gateway")
 @click.option("--client-id", required=True, help="Authenticated Client ID")
-@click.option("--token", required=True, help="Authentication token")
-def mcp_gateway(client_id, token):
+def mcp_gateway(client_id):
     """Start the standards-compliant MCP Stdio Gateway"""
     import logging
+    import os
     # Disable global logging to avoid corrupting stdio transport
     logging.getLogger().setLevel(logging.CRITICAL)
+    
+    token = os.environ.get("MCP_CLIENT_TOKEN")
+    if not token:
+        import sys
+        sys.stderr.write("Error: MCP_CLIENT_TOKEN environment variable is required\\n")
+        sys.exit(1)
+        
     from vidurai.daemon.mcp.gateway import MCPGateway
     import anyio
     

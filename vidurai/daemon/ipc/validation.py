@@ -19,7 +19,7 @@ def validate_class1_evidence(msg_v: int, msg_type: str, msg_ts: int, msg_id: str
         return False, "missing_required_field", "Missing 'type'"
         
     # Determine taxonomy (Class 1, 2, 3)
-    class1_types = {'file_edit', 'terminal', 'diagnostic', 'terminal_command', 'diagnostics'}
+    class1_types = {'file_edit', 'terminal', 'diagnostic', 'terminal_command', 'diagnostics', 'mcp_evidence'}
     class2_types = {'recall', 'search'}
     class3_types = {'handshake', 'ping', 'echo'}
     
