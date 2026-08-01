@@ -4,7 +4,7 @@ from typing import Callable, List, Tuple
 
 logger = logging.getLogger("vidurai.storage.migrations")
 
-TARGET_SCHEMA_VERSION = 6
+TARGET_SCHEMA_VERSION = 7
 
 class MigrationError(Exception):
     pass
@@ -106,6 +106,49 @@ def _migration_v6(conn: sqlite3.Connection):
         SELECT id, path, last_active FROM projects
     """)
 
+def _migration_v7(conn: sqlite3.Connection):
+    # v7: WP-07 Context Capsule
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS context_capsules (
+            capsule_id TEXT PRIMARY KEY NOT NULL,
+            client_id TEXT NOT NULL,
+            project_uuid TEXT NOT NULL,
+            branch TEXT,
+            task TEXT,
+            content_hash TEXT NOT NULL,
+            status TEXT NOT NULL CHECK (status IN ('preview', 'approved', 'rejected', 'expired')),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            expires_at TIMESTAMP,
+            delivery_count INTEGER DEFAULT 0
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_context_capsules_lookup ON context_capsules(client_id, project_uuid, status)")
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS capsule_items (
+            capsule_id TEXT NOT NULL,
+            item_id TEXT NOT NULL,
+            category TEXT NOT NULL CHECK (category IN ('evidence', 'decision', 'working', 'unresolved', 'contradiction', 'interpretation', 'recommendation')),
+            source_id TEXT,
+            content TEXT NOT NULL,
+            inclusion_reason TEXT,
+            provenance TEXT,
+            FOREIGN KEY (capsule_id) REFERENCES context_capsules(capsule_id) ON DELETE CASCADE,
+            UNIQUE(capsule_id, item_id)
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_capsule_items_capsule ON capsule_items(capsule_id)")
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS capsule_excluded_items (
+            capsule_id TEXT NOT NULL,
+            item_id TEXT NOT NULL,
+            exclusion_reason TEXT,
+            FOREIGN KEY (capsule_id) REFERENCES context_capsules(capsule_id) ON DELETE CASCADE,
+            UNIQUE(capsule_id, item_id)
+        )
+    """)
+
 MIGRATIONS: List[Callable[[sqlite3.Connection], None]] = [
     None, # v0 -> v1 is base schema
     _migration_v2, # v1 -> v2
@@ -113,6 +156,7 @@ MIGRATIONS: List[Callable[[sqlite3.Connection], None]] = [
     _migration_v4, # v3 -> v4
     _migration_v5, # v4 -> v5
     _migration_v6, # v5 -> v6
+    _migration_v7, # v6 -> v7
 ]
 
 def get_current_version(conn: sqlite3.Connection) -> int:

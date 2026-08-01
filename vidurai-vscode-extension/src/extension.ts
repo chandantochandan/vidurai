@@ -307,6 +307,34 @@ async function showWelcome(context: vscode.ExtensionContext) {
  * Register commands
  */
 function registerCommands(context: vscode.ExtensionContext) {
+        vscode.commands.registerCommand("vidurai.previewCapsule", async () => {
+            const terminal = vscode.window.createTerminal("Vidurai CLI");
+            terminal.show();
+            terminal.sendText("agy capsule list-pending");
+            
+            const capsuleId = await vscode.window.showInputBox({
+                prompt: "Enter Capsule ID to preview",
+                placeHolder: "Capsule ID"
+            });
+            if (!capsuleId) return;
+            
+            const clientId = await vscode.window.showInputBox({
+                prompt: "Enter Client ID for this capsule",
+                placeHolder: "Client ID"
+            });
+            if (!clientId) return;
+            
+            const action = await vscode.window.showQuickPick(["Approve", "Reject"], {
+                placeHolder: "Approve or Reject this capsule?"
+            });
+            
+            if (action === "Approve") {
+                terminal.sendText(`agy capsule approve ${capsuleId} ${clientId}`);
+            } else if (action === "Reject") {
+                terminal.sendText(`agy capsule reject ${capsuleId} ${clientId}`);
+            }
+        });
+
     // Command: Copy Context
     context.subscriptions.push(
         vscode.commands.registerCommand('vidurai.copyContext', async () => {

@@ -100,10 +100,72 @@ class MCPGateway:
                     "properties": {
                         "project_path": {"type": "string", "description": "Absolute path to the project root"},
                         "content": {"type": "string", "description": "Evidence content string"},
-                        "source": {"type": "string", "description": "Source component identifier"},
-                        "event_id": {"type": "string", "description": "Optional UUID to ensure idempotency"}
+                        "source": {"type": "string"},
+                        "event_id": {"type": "string"},
+                        "timestamp": {"type": "integer"}
                     },
                     "required": ["project_path", "content", "source"]
+                }
+            ),
+            types.Tool(
+                name="request_capsule_preview",
+                description="Request a Context Capsule preview for a given task and category list.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "project_path": {"type": "string"},
+                        "task": {"type": "string"},
+                        "requested_categories": {
+                            "type": "array",
+                            "items": {"type": "string"}
+                        },
+                        "max_items": {"type": "integer"}
+                    },
+                    "required": ["project_path", "task", "requested_categories"]
+                }
+            ),
+            types.Tool(
+                name="get_capsule_status",
+                description="Get the status of a requested Context Capsule.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "capsule_id": {"type": "string"}
+                    },
+                    "required": ["capsule_id"]
+                }
+            ),
+            types.Tool(
+                name="consume_capsule",
+                description="Consume an approved Context Capsule.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "capsule_id": {"type": "string"}
+                    },
+                    "required": ["capsule_id"]
+                }
+            ),
+            types.Tool(
+                name="approve_capsule",
+                description="Approve a Context Capsule preview for delivery.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "capsule_id": {"type": "string"}
+                    },
+                    "required": ["capsule_id"]
+                }
+            ),
+            types.Tool(
+                name="reject_capsule",
+                description="Reject a Context Capsule preview.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "capsule_id": {"type": "string"}
+                    },
+                    "required": ["capsule_id"]
                 }
             )
         ]
@@ -232,6 +294,106 @@ class MCPGateway:
                     return types.CallToolResult(is_error=True, content=[types.TextContent(type="text", text=f"Error: {error_msg}")])
                 
                 return types.CallToolResult(is_error=False, content=[types.TextContent(type="text", text=json.dumps({"status": result.get("status", "success"), "receipt_id": result.get("receipt_id"), "event_id": event_id}) )])
+
+
+            elif name == "request_capsule_preview":
+                from vidurai.daemon.capsules.models import CapsuleCategory
+                from vidurai.daemon.capsules.service import CapsuleService
+                
+                task = args.get("task")
+                cats = args.get("requested_categories", [])
+                max_items = args.get("max_items", 50)
+                
+                if not task:
+                    return types.CallToolResult(is_error=True, content=[types.TextContent(type="text", text="Error: task is required.")])
+                    
+                requested = []
+                for c in cats:
+                    try:
+                        requested.append(CapsuleCategory(c))
+                    except ValueError:
+                        return types.CallToolResult(is_error=True, content=[types.TextContent(type="text", text=f"Error: Invalid category {c}.")])
+                        
+                db = self._get_db()
+                project_id = db.get_or_create_project(project_path)
+                with db.get_connection_for_reading() as conn:
+                    row = conn.execute("SELECT project_uuid FROM projects WHERE id = ?", (project_id,)).fetchone()
+                
+                if not row:
+                    return types.CallToolResult(is_error=True, content=[types.TextContent(type="text", text="Error: Project not found.")])
+                    
+                service = CapsuleService(db)
+                capsule = service.generate_preview(
+                    client_id=self.client_id,
+                    project_uuid=row[0],
+                    branch=None,
+                    task=task,
+                    requested_categories=requested,
+                    max_items=max_items,
+                    project_path=project_path
+                )
+                
+                return types.CallToolResult(is_error=False, content=[types.TextContent(type="text", text=json.dumps({"status": "preview_ready", "capsule_id": capsule.capsule_id}))])
+                
+            elif name == "get_capsule_status":
+                from vidurai.daemon.capsules.service import CapsuleService
+                capsule_id = args.get("capsule_id")
+                if not capsule_id:
+                    return types.CallToolResult(is_error=True, content=[types.TextContent(type="text", text="Error: capsule_id is required.")])
+                    
+                db = self._get_db()
+                service = CapsuleService(db)
+                capsule = service.get_capsule(capsule_id)
+                
+                if not capsule or capsule.client_id != self.client_id:
+                    return types.CallToolResult(is_error=True, content=[types.TextContent(type="text", text="Error: Capsule not found.")])
+                    
+                return types.CallToolResult(is_error=False, content=[types.TextContent(type="text", text=json.dumps({"status": capsule.status.value, "capsule": capsule.to_dict()}))])
+                
+            elif name == "approve_capsule":
+                from vidurai.daemon.capsules.service import CapsuleService
+                capsule_id = args.get("capsule_id")
+                if not capsule_id:
+                    return types.CallToolResult(is_error=True, content=[types.TextContent(type="text", text="Error: capsule_id is required.")])
+                    
+                db = self._get_db()
+                service = CapsuleService(db)
+                ok = service.approve_capsule(self.client_id, capsule_id)
+                
+                if not ok:
+                    return types.CallToolResult(is_error=True, content=[types.TextContent(type="text", text="Error: Cannot approve capsule.")])
+                    
+                return types.CallToolResult(is_error=False, content=[types.TextContent(type="text", text=json.dumps({"status": "approved"}))])
+                
+            elif name == "reject_capsule":
+                from vidurai.daemon.capsules.service import CapsuleService
+                capsule_id = args.get("capsule_id")
+                if not capsule_id:
+                    return types.CallToolResult(is_error=True, content=[types.TextContent(type="text", text="Error: capsule_id is required.")])
+                    
+                db = self._get_db()
+                service = CapsuleService(db)
+                ok = service.reject_capsule(self.client_id, capsule_id)
+                
+                if not ok:
+                    return types.CallToolResult(is_error=True, content=[types.TextContent(type="text", text="Error: Cannot reject capsule.")])
+                    
+                return types.CallToolResult(is_error=False, content=[types.TextContent(type="text", text=json.dumps({"status": "rejected"}))])
+                
+            elif name == "consume_capsule":
+                from vidurai.daemon.capsules.service import CapsuleService
+                capsule_id = args.get("capsule_id")
+                if not capsule_id:
+                    return types.CallToolResult(is_error=True, content=[types.TextContent(type="text", text="Error: capsule_id is required.")])
+                    
+                db = self._get_db()
+                service = CapsuleService(db)
+                capsule = service.consume_capsule(self.client_id, capsule_id)
+                
+                if not capsule:
+                    return types.CallToolResult(is_error=True, content=[types.TextContent(type="text", text="Error: Cannot consume capsule. It may not be approved or belongs to another client.")])
+                    
+                return types.CallToolResult(is_error=False, content=[types.TextContent(type="text", text=json.dumps(capsule.to_dict()))])
 
             else:
                 return types.CallToolResult(is_error=True, content=[types.TextContent(type="text", text=f"Error: Unknown tool '{name}'.")])

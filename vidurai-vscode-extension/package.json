@@ -193,6 +193,11 @@
         "command": "vidurai.generateAIContext",
         "title": "Vidurai: Generate AI Context XML",
         "icon": "$(robot)"
+      },
+      {
+        "command": "vidurai.previewCapsule",
+        "title": "Vidurai: Preview Context Capsule",
+        "icon": "$(eye)"
       }
     ],
     "menus": {

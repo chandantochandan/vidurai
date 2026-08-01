@@ -35,7 +35,7 @@ async def test_mcp_gateway_core_and_auth():
         # Test active revocation
         req_list = types.ListToolsRequest(method="tools/list")
         res_list = await gateway.list_tools(req_list)
-        assert len(res_list.tools) == 3
+        assert len(res_list.tools) == 8
         
         auth.revoke("test_client")
         with pytest.raises(RuntimeError, match="Authentication revoked"):

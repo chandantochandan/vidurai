@@ -1825,3 +1825,49 @@ def mcp_revoke(client_id, permission):
         pm.revoke(client_id)
         auth.revoke(client_id)
         click.echo(f"Revoked all permissions and credentials from {client_id}")
+
+
+@cli.group()
+def capsule():
+    """WP-07 Context Capsule Management"""
+    pass
+
+@capsule.command("list-pending")
+def list_pending():
+    """List all pending Context Capsule previews."""
+    db = get_db()
+    with db.get_connection_for_reading() as conn:
+        rows = conn.execute("SELECT capsule_id, client_id, task, created_at FROM context_capsules WHERE status = 'preview'").fetchall()
+    
+    if not rows:
+        click.echo("No pending capsules.")
+        return
+        
+    for r in rows:
+        click.echo(f"ID: {r['capsule_id']} | Client: {r['client_id']} | Task: {r['task']} | Created: {r['created_at']}")
+
+@capsule.command("approve")
+@click.argument("capsule_id")
+@click.argument("client_id")
+def approve_capsule_cmd(capsule_id, client_id):
+    """Approve a context capsule preview"""
+    from vidurai.daemon.capsules.service import CapsuleService
+    db = get_db()
+    service = CapsuleService(db)
+    if service.approve_capsule(client_id, capsule_id):
+        click.echo("Approved.")
+    else:
+        click.echo("Failed to approve.")
+
+@capsule.command("reject")
+@click.argument("capsule_id")
+@click.argument("client_id")
+def reject_capsule_cmd(capsule_id, client_id):
+    """Reject a context capsule preview"""
+    from vidurai.daemon.capsules.service import CapsuleService
+    db = get_db()
+    service = CapsuleService(db)
+    if service.reject_capsule(client_id, capsule_id):
+        click.echo("Rejected.")
+    else:
+        click.echo("Failed to reject.")
